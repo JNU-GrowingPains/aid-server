@@ -1,1 +1,1 @@
-# aid-server
+print("Hello FastAPI!")
