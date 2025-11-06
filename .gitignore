@@ -8,7 +8,7 @@ pyvenv.cfg
 # IDE
 .idea/
 PyCharm*/
-
+....
 # Python 캐시
 __pycache__/
 *.pyc
