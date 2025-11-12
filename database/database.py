@@ -1,10 +1,8 @@
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
+from config.settings import settings
 
-# AWS RDS MySQL 연결 URL
-DATABASE_URL = (
-    "mysql+aiomysql://admin:wemeet2025@coredata-0.cbmakace0h32.ap-northeast-2.rds.amazonaws.com:3306/coredata"
-)
+DATABASE_URL = settings.DATABASE_URL
 
 engine = create_async_engine(
     DATABASE_URL,
@@ -13,7 +11,9 @@ engine = create_async_engine(
 )
 
 async_session = sessionmaker(
-    engine, expire_on_commit=False, class_=AsyncSession
+    engine,
+    expire_on_commit=False,
+    class_=AsyncSession
 )
 
 Base = declarative_base()

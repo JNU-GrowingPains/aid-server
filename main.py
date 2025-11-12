@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from database import get_db
+from database.database import get_db
 from sqlalchemy import text
 
 
