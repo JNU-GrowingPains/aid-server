@@ -18,7 +18,7 @@ CREATE TABLE categories (
 )
 
 -- 사이트(pages)
-CREATE TABLE sites (
+CREATE TABLE pages (
   site_id       BIGINT PRIMARY KEY AUTO_INCREMENT,
   customer_id   BIGINT  NOT NULL,
   site_url      TEXT NOT NULL,
@@ -69,8 +69,8 @@ CREATE TABLE order_products (
   order_product_id   BIGINT PRIMARY KEY AUTO_INCREMENT,
   product_id         BIGINT  NOT NULL,
   order_product_date DATE    NULL,
-  order_product_count BIGINT NULL,   --판매 물품수
-  order_product_amount BIGINT NULL,  --매출액
+  order_product_count INT NULL,   --판매 물품수
+  order_product_amount INT NULL,  --매출액
   order_id           BIGINT  NOT NULL,
   CONSTRAINT order_products_products_product_id_fk
     FOREIGN KEY (product_id) REFERENCES products(product_id),
