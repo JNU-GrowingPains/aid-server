@@ -1,14 +1,70 @@
-# Python 가상환경
-venv/
-Scripts/
-Lib/
-Include/
-pyvenv.cfg
-
-# IDE
-.idea/
-PyCharm*/
-
-# Python 캐시
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+
+# 가상환경
+.venv/
+venv/
+ENV/
+env/
+
+# 패키지/모듈 빌드
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# 로그 / 임시 파일
+*.log
+*.tmp
+*.temp
+*.pid
+
+# 환경변수 파일 (중요!)
+.env
+.env.*
+*.env
+
+# DB 파일(Optional)
+*.sqlite
+*.sqlite3
+*.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# 타입 검사 / 캐시
+.mypy_cache/
+.pyre/
+.pytype/
+.cache/
+
+# 테스트
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+
+# IDE 설정 (필수 - PyCharm)
+.idea_backup/
+*.iml
+
+# VSCode
+.vscode/
+
+# OS 파일
+.DS_Store
+Thumbs.db
+
+# Static / Media (FastAPI가 생성하는 경우)
+staticfiles/
+media/
+
+# 파이썬 컴파일된 파일
+*.pyo
+*.pyd
+*.pkl
+
+# Uvicorn reload artifact
+*.pid
