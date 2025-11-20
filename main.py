@@ -1,19 +1,17 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func
+
 from database import get_db
-from sqlalchemy import text
+from dashboard.router import router as dashboard_router
 
+app = FastAPI(title="Dashboard API (ORM)")
 
-
-app = FastAPI()
-
+# 헬스체크
 @app.get("/")
 async def test_connection(db: AsyncSession = Depends(get_db)):
-    try:
-        result = await db.execute(text("SELECT NOW()"))
-        current_time = result.scalar()
-        return {"message": "Connected to AWS RDS!", "time": current_time}
-    except Exception as e:
-        # 브라우저/터미널에서 에러 원문을 그대로 보기 위해
-        return {"error": str(e)}
+    now = (await db.execute(select(func.now()))).scalar_one()
+    return {"message": "Connected to AWS RDS!", "time": now}
 
+
+app.include_router(dashboard_router)
