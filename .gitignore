@@ -47,6 +47,7 @@ htmlcov/
 .pytest_cache/
 
 # IDE 설정 (필수 - PyCharm)
+.idea/
 .idea_backup/
 *.iml
 
