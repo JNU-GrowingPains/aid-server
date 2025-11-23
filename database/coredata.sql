@@ -34,7 +34,7 @@ CREATE TABLE users (
   user_id   BIGINT PRIMARY KEY AUTO_INCREMENT,
   site_id   BIGINT NOT NULL,
   CONSTRAINT fk_users_pages
-    FOREIGN KEY (site_id) REFERENCES sites(site_id)
+    FOREIGN KEY (site_id) REFERENCES pages(site_id)
 
 )
 
@@ -48,7 +48,7 @@ CREATE TABLE products (
   site_id      BIGINT       NOT NULL,
   category_id  BIGINT       NOT NULL,
   CONSTRAINT products_pages_site_id_fk
-    FOREIGN KEY (site_id) REFERENCES sites(site_id),
+    FOREIGN KEY (site_id) REFERENCES pages(site_id),
   CONSTRAINT products_categories_category_id_fk
     FOREIGN KEY (category_id) REFERENCES categories(category_id)
 )
@@ -84,8 +84,8 @@ CREATE TABLE visit_sources (
   source_type VARCHAR(20)  NULL, --광고매체, URL, 키워드
   visit_count INT       NULL, --유입자 수
   site_id     BIGINT       NOT NULL,
-  CONSTRAINT vistit_sources_pages_site_id_fk
-    FOREIGN KEY (site_id) REFERENCES sites(site_id)
+  CONSTRAINT visit_sources_pages_site_id_fk
+    FOREIGN KEY (site_id) REFERENCES pages(site_id)
 )
 
 -- 이벤트(events)

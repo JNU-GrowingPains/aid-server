@@ -2,10 +2,12 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.database import get_db
 from sqlalchemy import text
-from routers.auth import router as register_router
+from routers.auth.register import router as register_router
+from routers.auth.login import router as login_router
 
 
 app = FastAPI()
+
 
 @app.get("/")
 async def test_connection(db: AsyncSession = Depends(get_db)):
@@ -18,3 +20,4 @@ async def test_connection(db: AsyncSession = Depends(get_db)):
         return {"error": str(e)}
 
 app.include_router(register_router)
+app.include_router(login_router)

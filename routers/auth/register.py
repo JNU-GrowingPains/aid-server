@@ -1,11 +1,11 @@
-# routers/auth.py
+# routers/register.py
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.database import get_db
-from schemas.auth import SignupRequest, CustomerResponse
-from services.auth import AuthService
+from schemas.auth.register import SignupRequest, CustomerResponse
+from services.auth.register import AuthService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 

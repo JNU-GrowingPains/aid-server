@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from database.database import Base
 
 
-# -----------------------------
+# -----------------------------x
 # Customers
 # -----------------------------
 class Customer(Base):
@@ -62,7 +62,7 @@ class User(Base):
     __tablename__ = "users"
 
     user_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    site_id = Column(BigInteger, ForeignKey("sites.site_id"), nullable=False)
+    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
 
     # relationships
     site = relationship("Site", back_populates="users")
@@ -81,7 +81,7 @@ class Product(Base):
     product_name = Column(String(50))
     order_count = Column(Integer)              # 상품 조회수
     device = Column(String(20))
-    site_id = Column(BigInteger, ForeignKey("sites.site_id"), nullable=False)
+    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
     category_id = Column(BigInteger, ForeignKey("categories.category_id"), nullable=False)
 
     # relationships
@@ -135,7 +135,7 @@ class VisitSource(Base):
     source_id = Column(BigInteger, primary_key=True, autoincrement=True)
     source_type = Column(String(20))   # 광고매체, URL, 키워드
     visit_count = Column(Integer)      # 유입자 수
-    site_id = Column(BigInteger, ForeignKey("sites.site_id"), nullable=False)
+    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
 
     # relationships
     site = relationship("Site", back_populates="visit_sources")
