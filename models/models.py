@@ -1,6 +1,7 @@
-from sqlalchemy import (Column, Integer, BigInteger, String, Text, Date, ForeignKey)
+from sqlalchemy import (Column, Integer, BigInteger, String, Text, Date, ForeignKey, DateTime)
 from sqlalchemy.orm import relationship
 from database.database import Base
+from datetime import datetime, timezone
 
 
 # -----------------------------x
@@ -17,6 +18,7 @@ class Customer(Base):
 
     # relationships
     sites = relationship("Site", back_populates="customer")
+    refresh_tokens = relationship("RefreshToken", back_populates="customer")
 
 
 # -----------------------------
@@ -157,3 +159,26 @@ class Event(Base):
     # relationships
     product = relationship("Product", back_populates="events")
     user = relationship("User", back_populates="events")
+
+
+# -----------------------------
+# Refresh Tokens
+# -----------------------------
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    refresh_token_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    customer_id = Column(
+        BigInteger,
+        ForeignKey("customers.customer_id"),
+        nullable=False
+    )
+    token = Column(String(512), nullable=False, unique=True)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # relationships
+    customer = relationship("Customer", back_populates="refresh_tokens")

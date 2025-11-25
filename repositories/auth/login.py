@@ -1,8 +1,8 @@
-from typing import Optional
+#repositories/auth/login.py
 
+from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-
 from models.models import Customer
 
 

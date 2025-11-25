@@ -1,3 +1,5 @@
+#schemas/auth/login.py
+
 from pydantic import BaseModel, EmailStr
 
 

@@ -102,4 +102,14 @@ CREATE TABLE events (
     FOREIGN KEY (user_id) REFERENCES users(user_id)
 )
 
+--refresh_tokens
+CREATE TABLE refresh_tokens (
+    refresh_token_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    customer_id BIGINT NOT NULL,
+    token VARCHAR(512) NOT NULL UNIQUE,
+    created_at DATETIME NOT NULL,
+    CONSTRAINT refresh_tokens_ibfk_1
+     FOREIGN KEY (customer_id) REFERENCES customers(customer_id)
+);
+
 SET FOREIGN_KEY_CHECKS = 1;
