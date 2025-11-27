@@ -21,5 +21,6 @@ async def login(
 @router.post("/refresh", response_model=TokenPair, summary="Refresh 토큰으로 토큰 재발급")
 async def refresh_tokens(
     data: RefreshRequest,
+    db: AsyncSession = Depends(get_db),
 ):
-    return await LoginService.refresh_token(data)
+    return await LoginService.refresh_token(db, data)

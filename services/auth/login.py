@@ -1,6 +1,6 @@
 #services/auth/login.py
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from fastapi import HTTPException, status
 from jose import jwt, JWTError
@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import settings
 from repositories.auth.login import LoginRepository
+from repositories.auth.refresh_token import RefreshTokenRepository
 from schemas.auth.login import LoginRequest, TokenPair, RefreshRequest
 
 
@@ -87,10 +88,21 @@ class LoginService:
         access_token = create_access_token(subject)
         refresh_token = create_refresh_token(subject)
 
+        # 기존에 발급된 RefreshToken들 제거 (선택 사항, 한 계정당 1개만 유지하려는 경우)
+        await RefreshTokenRepository.delete_all_by_customer(db, customer.customer_id)
+
+        # 새 RefreshToken DB에 저장
+        await RefreshTokenRepository.create(
+            db=db,
+            customer_id=customer.customer_id,
+            token=refresh_token,
+        )
+
         return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
     @staticmethod
-    async def refresh_token(data: RefreshRequest) -> TokenPair:
+    async def refresh_token(db: AsyncSession, data: RefreshRequest) -> TokenPair:
+        # 1) JWT 검증 (서명/유효기간/타입 확인)
         payload = decode_token(data.refresh_token)
 
         if payload.get("type") != "refresh":
@@ -106,8 +118,29 @@ class LoginService:
                 detail="Invalid token payload",
             )
 
-        # refresh로 새 access + 새 refresh 둘 다 발급하는 패턴
+        customer_id = int(subject)
+
+        # 2) DB에서 해당 토큰이 실제로 존재하는지 확인
+        stored_token = await RefreshTokenRepository.get_by_token(db, data.refresh_token)
+        if stored_token is None or stored_token.customer_id != customer_id:
+            # DB에 없으면 → 이미 삭제된/탈취된/조작된 토큰
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Refresh token not found or revoked",
+            )
+
+        # 3) 토큰 회전(Token rotation): 사용된 기존 토큰 삭제
+        await RefreshTokenRepository.delete_by_id(db, stored_token.refresh_token_id)
+
+        # 4) 새 access + 새 refresh 발급
         new_access = create_access_token(subject)
         new_refresh = create_refresh_token(subject)
+
+        # 5) 새 refresh를 DB에 저장
+        await RefreshTokenRepository.create(
+            db=db,
+            customer_id=customer_id,
+            token=new_refresh,
+        )
 
         return TokenPair(access_token=new_access, refresh_token=new_refresh)

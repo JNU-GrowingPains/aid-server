@@ -4,7 +4,7 @@ from database.database import get_db
 from sqlalchemy import text
 from routers.auth.register import router as register_router
 from routers.auth.login import router as login_router
-
+from routers.auth.logout import router as logout_router
 
 app = FastAPI()
 
@@ -21,3 +21,4 @@ async def test_connection(db: AsyncSession = Depends(get_db)):
 
 app.include_router(register_router)
 app.include_router(login_router)
+app.include_router(logout_router)
