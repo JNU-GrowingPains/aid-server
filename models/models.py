@@ -1,4 +1,4 @@
-# models.py
+# models.py : db 테이블 구조 (무엇을 저장하는지)
 from __future__ import annotations
 from typing import Optional, List
 from datetime import date

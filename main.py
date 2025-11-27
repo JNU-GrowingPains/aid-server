@@ -2,7 +2,7 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
-from database import get_db
+from database.session import get_db
 from dashboard.router import router as dashboard_router
 
 app = FastAPI(title="Dashboard API (ORM)")

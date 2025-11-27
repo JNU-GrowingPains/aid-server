@@ -1,12 +1,12 @@
-# db 직접 접근
 # select· join 등 SQLAlchemy ORM 쿼리 담당
+# db에서 실제로 데이터를 읽고 합쳐서 쿼리하는 곳 (어떻게 가져올지)
 
 
 from datetime import date
 from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models import (
+from models.models import (
     OrderProduct, VisitSource, Product, Category, Event
 )
 

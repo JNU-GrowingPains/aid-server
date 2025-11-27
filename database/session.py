@@ -1,3 +1,4 @@
+# db연결/세션 생성하는 곳
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 

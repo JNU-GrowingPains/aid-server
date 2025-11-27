@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date
 from typing import Optional
 
-from database import get_db
-from .service import (
+from database.session import get_db
+from services.dashboard import (
     get_kpi_summary,
     get_monthly_sales,
     get_top_products,
