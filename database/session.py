@@ -1,8 +1,11 @@
+# db연결/세션 생성하는 곳
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 from config.settings import settings
 
+
 DATABASE_URL = settings.DATABASE_URL
+
 
 engine = create_async_engine(
     DATABASE_URL,
@@ -16,7 +19,6 @@ async_session = sessionmaker(
     class_=AsyncSession
 )
 
-Base = declarative_base()
 
 # 세션 의존성
 async def get_db():

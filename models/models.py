@@ -184,3 +184,4 @@ class RefreshToken(Base):
 
     # relationships
     customer = relationship("Customer", back_populates="refresh_tokens")
+
