@@ -1,116 +1,187 @@
-# models.py : db 테이블 구조 (무엇을 저장하는지)
-from __future__ import annotations
-from typing import Optional, List
-from datetime import date
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-from sqlalchemy import BigInteger, Integer, String, Date, ForeignKey
+#models/models.py
 
-class Base(DeclarativeBase):
-    pass
+from sqlalchemy import (Column, Integer, BigInteger, String, Text, Date, ForeignKey, DateTime)
+from sqlalchemy.orm import relationship
+from database.database import Base
+from datetime import datetime, timezone
 
-# ---------- pages / customers ----------
+
+# -----------------------------x
+# Customers
+# -----------------------------
 class Customer(Base):
     __tablename__ = "customers"
-    customer_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    name:          Mapped[Optional[str]] = mapped_column(String(50))
-    email:         Mapped[Optional[str]] = mapped_column(String(100))
-    password:      Mapped[Optional[str]] = mapped_column(String(255))
-    customer_category: Mapped[Optional[str]] = mapped_column(String(50))
 
-    pages: Mapped[List["Page"]] = relationship(back_populates="customer")
+    customer_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    name = Column(String(50))
+    email = Column(String(100), unique=True)
+    password = Column(String(255))
+    customer_category = Column(String(50))
 
-class Page(Base):
-    __tablename__ = "pages"
-    site_id:      Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    site_url:     Mapped[str] = mapped_column(String(255), nullable=False)
-    site_name:    Mapped[Optional[str]] = mapped_column(String(50))
-    site_category:Mapped[Optional[str]] = mapped_column(String(50))
-    site_tz:      Mapped[Optional[str]] = mapped_column(String(50))
-    customer_id:  Mapped[int] = mapped_column(BigInteger, ForeignKey("customers.customer_id"), nullable=False)
+    # relationships
+    sites = relationship("Site", back_populates="customer")
+    refresh_tokens = relationship("RefreshToken", back_populates="customer")
 
-    customer: Mapped["Customer"] = relationship(back_populates="pages")
-    users:    Mapped[List["User"]] = relationship(back_populates="page")
-    visits:   Mapped[List["VisitSource"]] = relationship(back_populates="page")
-    products: Mapped[List["Product"]] = relationship(back_populates="page")
 
-# ---------- users / orders ----------
-class User(Base):
-    __tablename__ = "users"
-    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    site_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
-
-    page:   Mapped["Page"] = relationship(back_populates="users")
-    orders: Mapped[List["Order"]] = relationship(back_populates="user")
-    events: Mapped[List["Event"]] = relationship(back_populates="user")
-
-class Order(Base):
-    __tablename__ = "orders"
-    order_id:     Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    order_date:   Mapped[Optional[date]] = mapped_column(Date)
-    order_count:  Mapped[Optional[int]] = mapped_column(BigInteger)
-    order_amount: Mapped[Optional[int]] = mapped_column(BigInteger)
-    user_id:      Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id"))
-
-    user: Mapped["User"] = relationship(back_populates="orders")
-    items: Mapped[List["OrderProduct"]] = relationship(back_populates="order")
-
-# ---------- categories / products ----------
+# -----------------------------
+# Categories
+# -----------------------------
 class Category(Base):
     __tablename__ = "categories"
-    category_no:    Mapped[int] = mapped_column("category_id", BigInteger, primary_key=True, autoincrement=True)
-    category_name:  Mapped[Optional[str]] = mapped_column(String(50))
-    category_carts_count_per: Mapped[Optional[int]] = mapped_column(BigInteger)
-    category_sales_price_per: Mapped[Optional[int]] = mapped_column(BigInteger)
-    page_url:       Mapped[Optional[str]] = mapped_column(String(255))
 
-    products: Mapped[List["Product"]] = relationship(back_populates="category")
+    category_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    category_name = Column(String(50))
+    category_carts_count_per = Column(Integer)      # 카테고리별 담긴 수
+    category_sales_price_per = Column(Integer)      # 카테고리별 상품 판매 금액
+    page_url = Column(Text)
 
+    # relationships
+    products = relationship("Product", back_populates="category")
+
+
+# -----------------------------
+# Sites (pages)
+# -----------------------------
+class Site(Base):
+    __tablename__ = "pages"
+
+    site_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    customer_id = Column(BigInteger, ForeignKey("customers.customer_id"), nullable=False)
+    site_url = Column(Text, nullable=False)
+    site_name = Column(String(50))
+    site_category = Column(String(50))
+    site_tz = Column(String(50))
+
+    # relationships
+    customer = relationship("Customer", back_populates="sites")
+    users = relationship("User", back_populates="site")
+    products = relationship("Product", back_populates="site")
+    visit_sources = relationship("VisitSource", back_populates="site")
+
+
+# -----------------------------
+# Users (internal users)
+# -----------------------------
+class User(Base):
+    __tablename__ = "users"
+
+    user_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
+
+    # relationships
+    site = relationship("Site", back_populates="users")
+    orders = relationship("Order", back_populates="user")
+    events = relationship("Event", back_populates="user")
+
+
+# -----------------------------
+# Products
+# -----------------------------
 class Product(Base):
     __tablename__ = "products"
-    product_no:   Mapped[int] = mapped_column("product_id", BigInteger, primary_key=True, autoincrement=True)
-    product_code: Mapped[Optional[str]] = mapped_column(String(50))
-    product_name: Mapped[Optional[str]] = mapped_column(String(50))
-    order_count:  Mapped[Optional[int]] = mapped_column(BigInteger)
-    device:       Mapped[Optional[str]] = mapped_column(String(20))   # PC/모바일/기타
-    site_id:      Mapped[int] = mapped_column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
-    category_no:  Mapped[int] = mapped_column("category_id", BigInteger, ForeignKey("categories.category_id"), nullable=False)
 
-    category: Mapped["Category"] = relationship(back_populates="products")
-    page:     Mapped["Page"] = relationship(back_populates="products")
-    items:    Mapped[List["OrderProduct"]] = relationship(back_populates="product")
-    events:   Mapped[List["Event"]] = relationship(back_populates="product")
+    product_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    product_code = Column(String(50))
+    product_name = Column(String(50))
+    order_count = Column(Integer)              # 상품 조회수
+    device = Column(String(20))
+    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
+    category_id = Column(BigInteger, ForeignKey("categories.category_id"), nullable=False)
 
-# ---------- order_products ----------
+    # relationships
+    site = relationship("Site", back_populates="products")
+    category = relationship("Category", back_populates="products")
+    order_products = relationship("OrderProduct", back_populates="product")
+    events = relationship("Event", back_populates="product")
+
+
+# -----------------------------
+# Orders
+# -----------------------------
+class Order(Base):
+    __tablename__ = "orders"
+
+    order_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    order_date = Column(Date)
+    order_count = Column(Integer)      # 주문 건수
+    order_amount = Column(Integer)
+    user_id = Column(BigInteger, ForeignKey("users.user_id"))
+
+    # relationships
+    user = relationship("User", back_populates="orders")
+    order_products = relationship("OrderProduct", back_populates="order")
+
+
+# -----------------------------
+# Order Products (order details)
+# -----------------------------
 class OrderProduct(Base):
     __tablename__ = "order_products"
-    order_product_id:  Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    product_no:        Mapped[int] = mapped_column("product_id", BigInteger, ForeignKey("products.product_id"), nullable=False)
-    order_product_date:   Mapped[Optional[date]] = mapped_column(Date)
-    order_product_count:  Mapped[Optional[int]] = mapped_column(BigInteger)
-    order_product_amount: Mapped[Optional[int]] = mapped_column(BigInteger)
-    order_id:            Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("orders.order_id"))
 
-    product: Mapped["Product"] = relationship(back_populates="items")
-    order:   Mapped["Order"]   = relationship(back_populates="items")
+    order_product_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    product_id = Column(BigInteger, ForeignKey("products.product_id"), nullable=False)
+    order_product_date = Column(Date)
+    order_product_count = Column(BigInteger)    # 판매 물품 수
+    order_product_amount = Column(BigInteger)   # 매출액
+    order_id = Column(BigInteger, ForeignKey("orders.order_id"), nullable=False)
 
-# ---------- visit_sources / events ----------
+    # relationships
+    product = relationship("Product", back_populates="order_products")
+    order = relationship("Order", back_populates="order_products")
+
+
+# -----------------------------
+# Visit Sources
+# -----------------------------
 class VisitSource(Base):
     __tablename__ = "visit_sources"
-    source_id:   Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    source_type: Mapped[Optional[str]] = mapped_column(String(20))
-    visit_count: Mapped[Optional[int]] = mapped_column(BigInteger)
-    site_id:     Mapped[int] = mapped_column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
 
-    page: Mapped["Page"] = relationship(back_populates="visits")
+    source_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    source_type = Column(String(20))   # 광고매체, URL, 키워드
+    visit_count = Column(Integer)      # 유입자 수
+    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
 
+    # relationships
+    site = relationship("Site", back_populates="visit_sources")
+
+
+# -----------------------------
+# Events
+# -----------------------------
 class Event(Base):
     __tablename__ = "events"
-    event_id:      Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
-    event_day:     Mapped[Optional[date]] = mapped_column(Date)
-    event_category:Mapped[Optional[str]] = mapped_column(String(20))  # 클릭/장바구니추가 등
-    event_count:   Mapped[Optional[int]] = mapped_column(BigInteger)
-    product_no:    Mapped[int] = mapped_column("product_id", BigInteger, ForeignKey("products.product_id"))
-    user_id:       Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("users.user_id"))
 
-    product: Mapped["Product"] = relationship(back_populates="events")
-    user:    Mapped["User"]    = relationship(back_populates="events")
+    event_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    event_day = Column(Date)
+    event_category = Column(String(20))   # 클릭, 장바구니 추가 등
+    event_count = Column(Integer)         # 일별 클릭수, 장바구니 추가 수
+    product_id = Column(BigInteger, ForeignKey("products.product_id"))
+    user_id = Column(BigInteger, ForeignKey("users.user_id"))
+
+    # relationships
+    product = relationship("Product", back_populates="events")
+    user = relationship("User", back_populates="events")
+
+
+# -----------------------------
+# Refresh Tokens
+# -----------------------------
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+
+    refresh_token_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    customer_id = Column(
+        BigInteger,
+        ForeignKey("customers.customer_id"),
+        nullable=False
+    )
+    token = Column(String(512), nullable=False, unique=True)
+    created_at = Column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+    )
+
+    # relationships
+    customer = relationship("Customer", back_populates="refresh_tokens")
+
