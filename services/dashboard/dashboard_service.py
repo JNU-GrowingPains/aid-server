@@ -2,8 +2,8 @@
 from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# repositories/dashboard_service.py 파일 가져오기
-from repositories.dashboard import dashboard_service as repo
+# repositories/dashboard_repository.py 파일 가져오기
+from repositories.dashboard import dashboard_repository as repo
 
 
 def range_from_days(days: int) -> tuple[date, date]:

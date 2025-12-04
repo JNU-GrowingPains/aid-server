@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.database import get_db
+from database.session import get_db
 from schemas.auth.logout_schema import LogoutRequest, LogoutResponse
 from services.auth.logout_service import LogoutService
 from services.auth.token_service import TokenService
