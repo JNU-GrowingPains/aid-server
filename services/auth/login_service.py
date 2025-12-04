@@ -1,4 +1,4 @@
-#services/auth/login.py
+#services/auth/login_repository.py
 
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -8,9 +8,9 @@ from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from config.settings import settings
-from repositories.auth.login import LoginRepository
-from repositories.auth.refresh_token import RefreshTokenRepository
-from schemas.auth.login import LoginRequest, TokenPair, RefreshRequest
+from repositories.auth.login_repository import LoginRepository
+from repositories.auth.refresh_token_repository import RefreshTokenRepository
+from schemas.auth.login_schema import LoginRequest, TokenPair, RefreshRequest
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

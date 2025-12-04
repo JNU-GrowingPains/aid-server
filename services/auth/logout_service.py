@@ -1,10 +1,10 @@
-# services/auth/logout.py
+# services/auth/logout_repository.py
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from repositories.auth.logout import LogoutRepository
-from schemas.auth.logout import LogoutRequest, LogoutResponse
+from repositories.auth.logout_repository import LogoutRepository
+from schemas.auth.logout_schema import LogoutRequest, LogoutResponse
 
 
 class LogoutService:

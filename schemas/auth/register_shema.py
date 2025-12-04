@@ -1,4 +1,4 @@
-# schemas/register.py
+# schemas/register_repository.py
 
 from pydantic import BaseModel, EmailStr, field_validator
 from typing import Optional

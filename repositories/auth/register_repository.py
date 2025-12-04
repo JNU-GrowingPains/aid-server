@@ -1,4 +1,4 @@
-# repositories/register.py
+# repositories/register_repository.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select

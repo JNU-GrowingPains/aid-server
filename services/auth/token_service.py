@@ -1,7 +1,7 @@
-# services/auth/token.py
+# services/auth/token_service.py
 
 from fastapi import HTTPException, status
-from services.auth.login import decode_token
+from services.auth.login_service import decode_token
 
 
 class TokenService:

@@ -1,4 +1,4 @@
-# repositories/auth/refresh_token.py
+# repositories/auth/refresh_token_repository.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete

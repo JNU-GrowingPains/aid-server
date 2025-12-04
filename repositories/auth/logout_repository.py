@@ -1,4 +1,4 @@
-# repositories/auth/logout.py
+# repositories/auth/logout_repository.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete

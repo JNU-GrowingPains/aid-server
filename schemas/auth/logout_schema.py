@@ -1,4 +1,4 @@
-# schemas/auth/logout.py
+# schemas/auth/logout_repository.py
 
 from pydantic import BaseModel
 

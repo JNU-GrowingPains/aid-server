@@ -1,8 +1,8 @@
-# services/register.py
+# services/register_repository.py
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from schemas.auth.register import SignupRequest, CustomerResponse
-from repositories.auth.register import CustomerRepository
+from schemas.auth.register_shema import SignupRequest, CustomerResponse
+from repositories.auth.register_repository import CustomerRepository
 from passlib.context import CryptContext
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

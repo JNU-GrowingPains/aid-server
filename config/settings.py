@@ -1,4 +1,8 @@
+# config/settings.py
+
 from pydantic_settings import BaseSettings
+from fastapi.middleware.cors import CORSMiddleware
+
 
 class Settings(BaseSettings):
     DATABASE_URL: str
@@ -15,3 +19,24 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# 프론트 도메인들
+# 개발 중이면 일단 * 로 다 열어도 됨
+CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "*",  # 개발용 - 전부 허용
+]
+
+
+def setup_cors(app):
+    """FastAPI app에 CORS 미들웨어를 붙이는 함수"""
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )

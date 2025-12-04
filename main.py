@@ -2,12 +2,15 @@ from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.database import get_db
 from sqlalchemy import text
-from routers.auth.register import router as register_router
-from routers.auth.login import router as login_router
-from routers.auth.logout import router as logout_router
+from routers.auth.register_router import router as register_router
+from routers.auth.login_router import router as login_router
+from routers.auth.logout_router import router as logout_router
+from config.settings import setup_cors
 
 app = FastAPI()
 
+# ✅ CORS 설정
+setup_cors(app)
 
 @app.get("/")
 async def test_connection(db: AsyncSession = Depends(get_db)):

@@ -1,11 +1,11 @@
-#routers/auth/login.py
+#routers/auth/login_repository.py
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database.database import get_db
-from schemas.auth.login import LoginRequest, TokenPair, RefreshRequest
-from services.auth.login import LoginService
+from schemas.auth.login_schema import LoginRequest, TokenPair, RefreshRequest
+from services.auth.login_service import LoginService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
