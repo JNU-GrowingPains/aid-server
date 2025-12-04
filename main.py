@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from database.session import get_db
-from sqlalchemy import text
+from sqlalchemy import text, select, func
 from routers.auth.register_router import router as register_router
 from routers.auth.login_router import router as login_router
 from routers.auth.logout_router import router as logout_router
@@ -14,7 +14,6 @@ app = FastAPI()
 setup_cors(app)
 
 # 헬스체크
->>>>>>> origin/main
 @app.get("/")
 async def test_connection(db: AsyncSession = Depends(get_db)):
     now = (await db.execute(select(func.now()))).scalar_one()
