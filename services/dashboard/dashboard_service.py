@@ -1,9 +1,9 @@
-# services/dashboard.py : 날짜계산,리스트/딕셔너리 가공,레포지토리 호출
+# services/dashboard_service.py : 날짜계산,리스트/딕셔너리 가공,레포지토리 호출
 from datetime import date, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# repositories/dashboard.py 파일 가져오기
-from repositories import dashboard as repo
+# repositories/dashboard_service.py 파일 가져오기
+from repositories.dashboard import dashboard_service as repo
 
 
 def range_from_days(days: int) -> tuple[date, date]:

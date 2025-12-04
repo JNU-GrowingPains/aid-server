@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
 from database.session import get_db
-from dashboard.router import router as dashboard_router
+from routers.dashboard.dashboard_router import router as dashboard_router
 
 app = FastAPI(title="Dashboard API (ORM)")
 

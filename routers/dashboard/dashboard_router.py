@@ -8,7 +8,7 @@ from datetime import date
 from typing import Optional
 
 from database.session import get_db
-from services.dashboard import (
+from services.dashboard.dashboard_service import (
     get_kpi_summary,
     get_monthly_sales,
     get_top_products,
