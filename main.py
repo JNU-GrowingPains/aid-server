@@ -7,6 +7,7 @@ from routers.auth.login_router import router as login_router
 from routers.auth.logout_router import router as logout_router
 from config.settings import setup_cors
 from routers.dashboard.dashboard_router import router as dashboard_router
+from config.exceptions import value_error_handler
 
 app = FastAPI()
 
@@ -14,12 +15,12 @@ app = FastAPI()
 setup_cors(app)
 
 # 헬스체크
->>>>>>> origin/main
 @app.get("/")
 async def test_connection(db: AsyncSession = Depends(get_db)):
     now = (await db.execute(select(func.now()))).scalar_one()
     return {"message": "Connected to AWS RDS!", "time": now}
 
+app.add_exception_handler(ValueError, value_error_handler)
 
 app.include_router(register_router)
 app.include_router(login_router)
