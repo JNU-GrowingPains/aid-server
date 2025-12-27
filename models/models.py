@@ -83,6 +83,8 @@ class Product(Base):
     product_id = Column(BigInteger, primary_key=True, autoincrement=True)
     product_code = Column(String(50))
     product_name = Column(String(50))
+    price = Column(Integer, default=0)  #가격
+    stock = Column(Integer, default=0)  #재고
     order_count = Column(Integer)              # 상품 조회수
     device = Column(String(20))
     site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
@@ -93,6 +95,24 @@ class Product(Base):
     category = relationship("Category", back_populates="products")
     order_products = relationship("OrderProduct", back_populates="product")
     events = relationship("Event", back_populates="product")
+
+
+# -----------------------------
+# Review
+# -----------------------------
+class Review(Base):
+    __tablename__ = "reviews"
+
+    review_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    product_id = Column(BigInteger, ForeignKey("products.product_id"), nullable=False)
+    writer_name = Column(String(50))
+    rating = Column(Integer)
+    content = Column(Text)
+    sentiment = Column(String(10))      # 긍정/부정
+    created_at = Column(Date)
+
+    # relationships
+    product = relationship("Product", back_populates="reviews")
 
 
 # -----------------------------

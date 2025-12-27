@@ -11,11 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database.session import get_db
 from services.dashboard.dashboard_service import (
     get_kpi_summary,
-    get_monthly_sales,
+    get_daily_trend,
     get_top_products,
     get_device_share,
     get_orders_by_category,
     get_funnel,
+    get_review_analysis,
+    get_review_keywords
 )
 
 router = APIRouter(prefix="/api/v1", tags=["dashboard"])
@@ -24,19 +26,20 @@ router = APIRouter(prefix="/api/v1", tags=["dashboard"])
 # KPI Summary
 @router.get("/kpis/summary")
 async def kpi_summary(
-    days: int = Query(7, ge=1, le=30),
+    days: int = Query(30, ge=1, le=90),
     db: AsyncSession = Depends(get_db),
 ):
     return await get_kpi_summary(db, days)
 
 
-# Monthly Sales
-@router.get("/charts/monthly-sales")
-async def monthly_sales(
-    months: int = Query(12, ge=1, le=36),
+# Daily Trend Chart
+@router.get("/charts/daily-trend")
+async def daily_trend_chart(
+    days: int = Query(30, ge=7, le=90),
+    metric: str = Query("amount", pattern="^(amount|count|buyer)$"), # 유효성 검사
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_monthly_sales(db, months)
+    return await get_daily_trend(db, days, metric)
 
 
 # Top Products
@@ -49,6 +52,22 @@ async def top_products(
     db: AsyncSession = Depends(get_db),
 ):
     return await get_top_products(db, limit, from_date, to_date, category_id)
+
+
+# Review Analysis
+@router.get("/reviews/analysis")
+async def review_analysis(
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_review_analysis(db)
+
+
+# Word Cloud
+@router.get("/reviews/keywords")
+async def review_keywords(
+    db: AsyncSession = Depends(get_db),
+):
+    return await get_review_keywords(db)
 
 
 # Device Share

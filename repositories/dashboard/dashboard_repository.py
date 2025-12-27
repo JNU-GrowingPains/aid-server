@@ -5,16 +5,17 @@
 from datetime import date
 from typing import Optional
 
-from sqlalchemy import select, func, desc
+from sqlalchemy import select, func, desc, case, distinct
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.models import (
-    OrderProduct, VisitSource, Product, Category, Event
+    OrderProduct, VisitSource, Product, Category, Event, Review, Order
 )
 
 
 # ---------- KPI Summary ----------
 async def fetch_kpi_summary(db: AsyncSession, from_d: date, to_d: date):
+    # 1. 총 매출액
     q_sales = (
         select(func.coalesce(func.sum(OrderProduct.order_product_amount), 0))
         .where(
@@ -23,6 +24,7 @@ async def fetch_kpi_summary(db: AsyncSession, from_d: date, to_d: date):
         )
     )
 
+    # 2. 총 판매 수
     q_items = (
         select(func.coalesce(func.sum(OrderProduct.order_product_count), 0))
         .where(
@@ -31,32 +33,50 @@ async def fetch_kpi_summary(db: AsyncSession, from_d: date, to_d: date):
         )
     )
 
-    q_visits = select(func.coalesce(func.sum(VisitSource.visit_count), 0))
+    # 3. 총 구매자 수
+    q_buyers = (
+        select(func.count(distinct(Order.user_id)))
+        .join(OrderProduct, OrderProduct.order_id == Order.order_id)
+        .where(
+            OrderProduct.order_product_date >= from_d,
+            OrderProduct.order_product_date <= to_d,
+        )
+    )
 
     sales = (await db.execute(q_sales)).scalar_one()
     items = (await db.execute(q_items)).scalar_one()
-    visits = (await db.execute(q_visits)).scalar_one()
+    buyers = (await db.execute(q_buyers)).scalar_one()
 
-    return sales, items, visits
+    return sales, items, buyers
 
 
-# ---------- Monthly Sales ----------
-async def fetch_monthly_sales(db: AsyncSession, months: int):
-    ym = func.date_format(OrderProduct.order_product_date, "%Y-%m")
+# ---------- Daily Trend ----------
+async def fetch_daily_trend(db: AsyncSession, days: int, metric: str):
 
-    q = (
-        select(
-            ym.label("ym"),
-            func.round(
-                func.sum(OrderProduct.order_product_amount), 0
-            ).label("sales"),
-        )
-        .group_by(ym)
-        .order_by(desc("ym"))
-        .limit(months)
+    # 1. 컬럼 선택
+    if metric == "buyer":
+        target_col = func.count(distinct(Order.user_id)).label("value")
+    elif metric == "count":
+        target_col = func.sum(OrderProduct.order_product_count).label("value")
+    else:
+        target_col = func.sum(OrderProduct.order_product_amount).label("value")
+
+    # 2. 쿼리 생성
+    q = select(
+        OrderProduct.order_product_date.label("date"),
+        target_col
     )
 
-    return (await db.execute(q)).mappings().all()
+    if metric == "buyer":
+        q = q.join(Order, OrderProduct.order_id == Order.order_id)
+
+    q = (
+        q.group_by(OrderProduct.order_product_date)
+        .order_by(OrderProduct.order_product_date)
+        .limit(days) # 최근 N일
+    )
+
+    return (await db.execute(q)).all()
 
 
 # ---------- Top Products ----------
@@ -82,6 +102,8 @@ async def fetch_top_products(
             Product.product_id.label("product_id"),
             Product.product_code,
             Product.product_name,
+            Product.price,
+            Product.stock,
             Product.device,
             qty_sum,
             amount_sum,
@@ -107,6 +129,8 @@ async def fetch_top_products(
             Product.product_id,
             Product.product_code,
             Product.product_name,
+            Product.price,
+            Product.stock,
             Product.device,
         )
         .order_by(desc("total_sales"))
@@ -175,3 +199,34 @@ async def fetch_funnel(
 async def fetch_visits(db: AsyncSession):
     q = select(func.coalesce(func.sum(VisitSource.visit_count), 0))
     return (await db.execute(q)).scalar_one()
+
+
+# ---------- Review Stats ----------
+async def fetch_review_stats(db: AsyncSession):
+    # 1. 전체 통계
+    q_stats = select(
+        func.count(Review.review_id).label("total_reviews"),
+        func.avg(Review.rating).label("avg_rating"),
+        func.sum(case((Review.sentiment == '긍정', 1), else_=0)).label("positive_cnt"),
+        func.sum(case((Review.sentiment == '부정', 1), else_=0)).label("negative_cnt")
+    )
+
+    # 2. 부정 리뷰 Top 3 (최신순)
+    q_bad_reviews = (
+        select(Review)
+        .where(Review.sentiment == '부정')
+        .order_by(Review.created_at.desc())
+        .limit(3)
+    )
+
+    stats = (await db.execute(q_stats)).one()
+    bad_reviews = (await db.execute(q_bad_reviews)).scalars().all()
+
+    return stats, bad_reviews
+
+
+# ---------- All Review Texts (워드클라우드) ----------
+async def fetch_all_review_texts(db: AsyncSession):
+    q = select(Review.content)
+    return (await db.execute(q)).scalars().all()
+
