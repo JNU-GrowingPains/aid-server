@@ -7,6 +7,7 @@ from routers.auth.login_router import router as login_router
 from routers.auth.logout_router import router as logout_router
 from config.settings import setup_cors
 from routers.dashboard.dashboard_router import router as dashboard_router
+from routers.analysis import analysis_router
 
 app = FastAPI()
 
@@ -25,4 +26,4 @@ app.include_router(register_router)
 app.include_router(login_router)
 app.include_router(logout_router)
 app.include_router(dashboard_router)
-
+app.include_router(analysis_router.router)

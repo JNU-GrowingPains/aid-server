@@ -67,6 +67,13 @@ class User(Base):
 
     user_id = Column(BigInteger, primary_key=True, autoincrement=True)
     site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
+    name = Column(String(50))
+    email = Column(String(100), unique=True)
+    phone = Column(String(50))
+    grade = Column(String(50))
+    point = Column(Integer, default=0)
+    address = Column(String(255))
+    created_at = Column(Date)
 
     # relationships
     site = relationship("Site", back_populates="users")
