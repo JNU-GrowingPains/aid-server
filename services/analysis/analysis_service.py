@@ -1,7 +1,8 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from repositories.analysis import analysis_repository as repo
 from datetime import date
-
+from models.models import Member, MemberGroup
+from sqlalchemy import select
 
 # ---------- 고객 분석 서비스 ----------
 
@@ -98,3 +99,29 @@ async def get_user_detail_analysis(db: AsyncSession, user_id: int):
         "top_products": [{"name": p.product_name, "count": p.cnt} for p in products],
         "location_stat": location_stat
     }
+
+
+# ---------- 멤버 주소 및 전화번호 ----------
+async def get_customer_list(db: AsyncSession):
+    # Member와 등급 테이블 조인
+    query = select(Member, MemberGroup).join(MemberGroup, Member.group_no == MemberGroup.group_no, isouter=True)
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    response_list = []
+
+    for member, group in rows:
+        # 주소 합치기 (서울시 강남구 + 101호)
+        full_address = f"{member.address_1 or ''} {member.address_2 or ''}".strip()
+
+        response_list.append({
+            "customer_id": member.member_id,  # C001 등
+            "name": "고객",
+            "tier": group.group_name if group else "General",
+            "point": member.available_points or 0,
+            "phone": member.phone_number or "번호없음",
+            "address": full_address if full_address else "주소미입력"
+        })
+
+    return response_list

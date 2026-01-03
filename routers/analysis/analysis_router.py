@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from database.session import get_db
+from database.database import get_db
 from services.analysis import analysis_service
 
 router = APIRouter(prefix="/api/v1/analysis", tags=["analysis"])

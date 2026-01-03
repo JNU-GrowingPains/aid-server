@@ -1,20 +1,17 @@
 # 엔드포인트
 # HTTP, Query 처리 전담
-
+# dashboard_router.py
 
 from datetime import date
 from typing import Optional
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from database.database import get_db
 
-from database.session import get_db
 from services.dashboard.dashboard_service import (
     get_kpi_summary,
     get_daily_trend,
     get_top_products,
-    get_device_share,
-    get_orders_by_category,
     get_funnel,
     get_review_analysis,
     get_review_keywords
@@ -48,10 +45,10 @@ async def top_products(
     limit: int = Query(10, ge=1, le=100),
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
-    category_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_top_products(db, limit, from_date, to_date, category_id)
+
+    return await get_top_products(db, limit, from_date, to_date)
 
 
 # Review Analysis
@@ -68,24 +65,6 @@ async def review_keywords(
     db: AsyncSession = Depends(get_db),
 ):
     return await get_review_keywords(db)
-
-
-# Device Share
-@router.get("/tables/device-share")
-async def device_share(
-    metric: str = Query("amount", pattern="^(amount|count)$"),
-    db: AsyncSession = Depends(get_db),
-):
-    return await get_device_share(db, metric)
-
-
-# Orders by Category
-@router.get("/charts/orders-by-category")
-async def orders_by_category(
-    metric: str = Query("amount", pattern="^(amount|count)$"),
-    db: AsyncSession = Depends(get_db),
-):
-    return await get_orders_by_category(db, metric)
 
 
 # Funnel
