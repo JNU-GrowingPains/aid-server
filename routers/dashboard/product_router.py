@@ -2,7 +2,7 @@ from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from database.database import get_db
+from database.session import get_db
 
 from services.dashboard.product_service import (
     get_top_products, get_kpi_summary, get_daily_trend

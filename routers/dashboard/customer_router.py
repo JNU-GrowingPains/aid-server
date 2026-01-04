@@ -3,7 +3,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from database.database import get_db
+from database.session import get_db
 
 from services.dashboard.customer_service import (
     get_customer_kpi, get_customer_grade_counts, get_customer_list

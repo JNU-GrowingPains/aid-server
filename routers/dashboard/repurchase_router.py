@@ -1,7 +1,7 @@
 from typing import Optional, List
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from database.database import get_db
+from database.session import get_db
 
 from services.dashboard.repurchase_service import (
     get_repurchase_product_list,

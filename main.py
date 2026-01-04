@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from database.database import get_db, engine, Base
+from database.session import get_db, engine, Base
 from sqlalchemy import select, func
 from models import models
 
