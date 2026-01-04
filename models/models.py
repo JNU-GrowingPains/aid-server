@@ -1,13 +1,13 @@
 #models/models.py
 
-from sqlalchemy import (Column, Integer, BigInteger, String, Text, Date, ForeignKey, DateTime)
+from sqlalchemy import (Column, Integer, BigInteger, String, Text, Date, ForeignKey, DateTime, UniqueConstraint)
 from sqlalchemy.orm import relationship
 from database.session import Base
 from datetime import datetime, timezone
 
 
-# -----------------------------x
-# Customers
+# -----------------------------
+# 1. Customers
 # -----------------------------
 class Customer(Base):
     __tablename__ = "customers"
@@ -24,143 +24,156 @@ class Customer(Base):
 
 
 # -----------------------------
-# Categories
-# -----------------------------
-class Category(Base):
-    __tablename__ = "categories"
-
-    category_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    category_name = Column(String(50))
-    category_carts_count_per = Column(Integer)      # 카테고리별 담긴 수
-    category_sales_price_per = Column(Integer)      # 카테고리별 상품 판매 금액
-    page_url = Column(Text)
-
-    # relationships
-    products = relationship("Product", back_populates="category")
-
-
-# -----------------------------
-# Sites (pages)
+# 3. Sites (pages)
 # -----------------------------
 class Site(Base):
-    __tablename__ = "pages"
+    __tablename__ = "sites"
 
     site_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    customer_id = Column(BigInteger, ForeignKey("customers.customer_id"), nullable=False)
     site_url = Column(Text, nullable=False)
     site_name = Column(String(50))
     site_category = Column(String(50))
     site_tz = Column(String(50))
+    customer_id = Column(BigInteger, ForeignKey("customers.customer_id"), nullable=False)
 
     # relationships
     customer = relationship("Customer", back_populates="sites")
-    users = relationship("User", back_populates="site")
+    members = relationship("Member", back_populates="site")
     products = relationship("Product", back_populates="site")
-    visit_sources = relationship("VisitSource", back_populates="site")
 
 
 # -----------------------------
-# Users (internal users)
-# -----------------------------
-class User(Base):
-    __tablename__ = "users"
-
-    user_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
-
-    # relationships
-    site = relationship("Site", back_populates="users")
-    orders = relationship("Order", back_populates="user")
-    events = relationship("Event", back_populates="user")
-
-
-# -----------------------------
-# Products
+# 4. Products
 # -----------------------------
 class Product(Base):
     __tablename__ = "products"
 
     product_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    product_code = Column(String(50))
+    product_no = Column(Integer)
     product_name = Column(String(50))
-    order_count = Column(Integer)              # 상품 조회수
-    device = Column(String(20))
-    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
-    category_id = Column(BigInteger, ForeignKey("categories.category_id"), nullable=False)
+    product_price = Column(String(20))
+    product_display = Column(String(10))
+    product_category = Column(String(50), nullable=True)
+
+    site_id = Column(BigInteger, ForeignKey("sites.site_id"), nullable=False)
 
     # relationships
     site = relationship("Site", back_populates="products")
-    category = relationship("Category", back_populates="products")
     order_products = relationship("OrderProduct", back_populates="product")
-    events = relationship("Event", back_populates="product")
+    reviews = relationship("Review", back_populates="product")
 
 
 # -----------------------------
-# Orders
+# 5. Orders
 # -----------------------------
 class Order(Base):
     __tablename__ = "orders"
 
-    order_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    order_date = Column(Date)
-    order_count = Column(Integer)      # 주문 건수
-    order_amount = Column(Integer)
-    user_id = Column(BigInteger, ForeignKey("users.user_id"))
+    order_no = Column(BigInteger, primary_key=True, autoincrement=True)
+    order_id = Column(String(50), nullable=False)
+    order_date = Column(Date, nullable=True)
+    payment_amount = Column(Integer, nullable=True)
+    billing_name = Column(String(50), nullable=True)
+    payment_method_name = Column(String(100), nullable=True)
+    order_address_1 = Column(String(100), nullable=True)
+    order_address_2 = Column(String(100), nullable=True)
+    order_phone_number = Column(String(20), nullable=True)
+    order_email = Column(String(50), nullable=True)
+
+    member_id = Column(String(50), nullable=True)
+    user_id = Column(BigInteger, ForeignKey("members.user_id"), nullable=True)
+    site_id = Column(BigInteger, ForeignKey("sites.site_id"), nullable=False)
 
     # relationships
-    user = relationship("User", back_populates="orders")
+    member = relationship("Member", back_populates="orders")
     order_products = relationship("OrderProduct", back_populates="order")
+    site = relationship("Site", back_populates="orders")
 
 
 # -----------------------------
-# Order Products (order details)
+# 6. Order Products (order details)
 # -----------------------------
 class OrderProduct(Base):
     __tablename__ = "order_products"
 
-    order_product_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    order_product_no = Column(BigInteger, primary_key=True, autoincrement=True)
+    order_product_count = Column(Integer)
+    order_date = Column(Date)
+    product_name = Column(String(50))
+    product_price = Column(Integer)
+    order_quantity = Column(Integer)  # 주문 수량
+    order_product_amount = Column(Integer)   # 매출액
+    order_id = Column(String(50))
+    is_dirty = Column(Integer, default=0)
+    order_no = Column(BigInteger, ForeignKey("orders.order_no"), nullable=False)
     product_id = Column(BigInteger, ForeignKey("products.product_id"), nullable=False)
-    order_product_date = Column(Date)
-    order_product_count = Column(BigInteger)    # 판매 물품 수
-    order_product_amount = Column(BigInteger)   # 매출액
-    order_id = Column(BigInteger, ForeignKey("orders.order_id"), nullable=False)
 
     # relationships
     product = relationship("Product", back_populates="order_products")
     order = relationship("Order", back_populates="order_products")
 
 
-# -----------------------------
-# Visit Sources
-# -----------------------------
-class VisitSource(Base):
-    __tablename__ = "visit_sources"
 
-    source_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    source_type = Column(String(20))   # 광고매체, URL, 키워드
-    visit_count = Column(Integer)      # 유입자 수
-    site_id = Column(BigInteger, ForeignKey("pages.site_id"), nullable=False)
+# -----------------------------
+# 7. Member
+# -----------------------------
+class Member(Base):
+    __tablename__ = "members"
+
+    user_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    member_id = Column(String(50), nullable=False)
+    available_points = Column(Integer, default=0)
+    group_no = Column(Integer, nullable=True)
+    last_login_date = Column(Date, nullable=True)
+    site_id = Column(BigInteger, ForeignKey("sites.site_id"), nullable=False)
+    group_id = Column(BigInteger, ForeignKey("member_groups.group_id"), nullable=False)
 
     # relationships
-    site = relationship("Site", back_populates="visit_sources")
-
+    group = relationship("MemberGroup", back_populates="members")
+    orders = relationship("Order", back_populates="member")
+    reviews = relationship("Review", back_populates="member")
+    site = relationship("Site", back_populates="members")
+    # 하나의 사이트 내에서 member_id가 중복되면 안된다는 제약 조건
+    __table_args__ = (
+        UniqueConstraint('site_id', 'member_id', name='uix_site_member_id'),
+    )
 
 # -----------------------------
-# Events
+# 8. MemberGroup
 # -----------------------------
-class Event(Base):
-    __tablename__ = "events"
+class MemberGroup(Base):
+    __tablename__ = "member_groups"
 
-    event_id = Column(BigInteger, primary_key=True, autoincrement=True)
-    event_day = Column(Date)
-    event_category = Column(String(20))   # 클릭, 장바구니 추가 등
-    event_count = Column(Integer)         # 일별 클릭수, 장바구니 추가 수
-    product_id = Column(BigInteger, ForeignKey("products.product_id"))
-    user_id = Column(BigInteger, ForeignKey("users.user_id"))
+    group_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    group_no = Column(Integer)  # 관리번호
+    group_name = Column(String(50))
+    group_description = Column(String(50))
 
     # relationships
-    product = relationship("Product", back_populates="events")
-    user = relationship("User", back_populates="events")
+    members = relationship("Member", back_populates="group")
+
+
+
+# -----------------------------
+# 9. Review
+# -----------------------------
+class Review(Base):
+    __tablename__ = "reviews"
+
+    review_id = Column(BigInteger, primary_key=True, autoincrement=True)
+    writer = Column(String(50))
+    content = Column(Text)
+    rating = Column(Integer)
+    created_date = Column(String(20))
+    hit = Column(Integer, default=0)
+    product_no = Column(Integer)
+    member_id = Column(String(50), nullable=True)
+    product_id = Column(BigInteger, ForeignKey("products.product_id"), nullable=False)
+    user_id = Column(BigInteger, ForeignKey("members.user_id"), nullable=False)
+
+    # relationships
+    product = relationship("Product", back_populates="reviews")
+    member = relationship("Member", back_populates="reviews")
 
 
 # -----------------------------
@@ -184,4 +197,3 @@ class RefreshToken(Base):
 
     # relationships
     customer = relationship("Customer", back_populates="refresh_tokens")
-

@@ -19,6 +19,7 @@ async_session = sessionmaker(
     class_=AsyncSession
 )
 
+Base = declarative_base()
 
 # 세션 의존성
 async def get_db():
