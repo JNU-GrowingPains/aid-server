@@ -9,28 +9,26 @@ class RepurchaseProductItem(BaseModel):
     """재구매 상품 항목"""
     product_id: int
     product_name: str
-    category: str
-    price: str
-    repurchase_rate: float
+    price: int
     
     class Config:
         from_attributes = True
 
 
-class RepurchaseProductResponse(BaseModel):
+class RepurchaseProductListResponse(BaseModel):
     """재구매 상품 목록 응답"""
-    products: List[RepurchaseProductItem]
-    total_count: int
+    items: List[RepurchaseProductItem]
+    count: int
     
     class Config:
         from_attributes = True
 
 
-class RepurchaseStatsResponse(BaseModel):
-    """재구매 통계 응답"""
-    total_repurchase_count: int  # 총 재구매 수
+class RepurchaseKpisResponse(BaseModel):
+    """재구매 KPI 통계 응답"""
+    total_repurchase_count: int  # 총 재구매 고객 수
     avg_repurchase_rate: float   # 평균 재구매율 (%)
-    avg_repurchase_days: int     # 재구매까지 걸린 기간 (일)
+    avg_repurchase_days: int     # 재구매까지 걸린 평균 기간 (일)
     same_product_rate: float     # 동일 상품 재구매 비율 (%)
     sales_contribution: float    # 재구매 고객 매출 기여도 (%)
     
@@ -40,28 +38,27 @@ class RepurchaseStatsResponse(BaseModel):
 
 class RepurchaseCustomerItem(BaseModel):
     """재구매 고객 항목"""
+    user_id: Optional[int]
     customer_id: str
     name: str
     grade: str
-    purchase_count: int
+    purchase_count: str  # "N회" 형식
     address: str
     phone: str
     email: str
-    points: int
-    avg_repurchase_period: int  # 평균 재구매 주기 (일)
-    last_purchase_date: Optional[date]
+    point: str  # "N,NNNP" 형식
+    avg_period: str  # "N일" 형식
     
     class Config:
         from_attributes = True
 
 
-class RepurchaseCustomerResponse(BaseModel):
+class RepurchaseCustomerListResponse(BaseModel):
     """재구매 고객 리스트 응답"""
-    customers: List[RepurchaseCustomerItem]
     total_count: int
     page: int
     limit: int
-    total_pages: int
+    items: List[RepurchaseCustomerItem]
     
     class Config:
         from_attributes = True

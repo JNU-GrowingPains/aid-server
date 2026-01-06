@@ -3,22 +3,63 @@
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from repositories.dashboard import repurchase_repository as repo
+from schemas.dashboard.repurchase_schema import (
+    RepurchaseProductItem,
+    RepurchaseProductListResponse
+)
+from config.product_groups import PRODUCT_GROUPS
 
 
-async def get_repurchase_product_list(db: AsyncSession):
+async def get_repurchase_product_list(db: AsyncSession) -> RepurchaseProductListResponse:
     """
     그룹화된 대표 상품 목록 반환
     """
     rows = await repo.get_repurchase_product_list(db)
-    return [
-        {
-            "product_id": r.product_id,
-            "product_name": r.product_name,
-            "price": r.product_price
-        } 
+    
+    items = [
+        RepurchaseProductItem(
+            produdt_id=r.product_id,
+            product_name=r.product_name,
+            price=r.product_price
+        )
         for r in rows
     ]
+    
+    return RepurchaseProductListResponse(items=items, count=len(items))
 
+
+
+
+async def get_repurchase_kpis_v2(db: AsyncSession, product_ids: Optional[List[int]] = None):
+    # 결제 테이블에서 회원 수  =   repo.get_login_user_count()
+    console.log("user count:", userCount);
+    # 결제 테이블에서 비회원 수  =   repo.get_not_login_user_count()
+
+
+    # 전체 회원 수 = 가입 회원 수 + 비가입 회원 수
+    # repo.count   order by
+    # list  .
+    #   select    ->   where 조건, order by ,  join ,   group by + having  ,
+    return  ResponseDto(재구매율 = )
+
+
+
+    # 회원
+        # 유저 아이디가 있으면  재구매
+    # 비회원 (결제 이름 + 주소 => 같은 사람으로 그룹)
+        # 재구매한 고객 수 ( 주문 수가 2 이상인 고객 수 )
+        #  재구매 고객 수 /  전체 구매 고개 수
+
+    # 최근 재구매일 - 첫 구매일
+    #
+        # 평균 재구매율
+    # 동일 상품 재구매
+        #
+
+    # 재구매 고객수  /  전체 고객 수   * 100 =>
+
+    # repo select
+    # return result
 
 async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]] = None):
     """
@@ -34,7 +75,21 @@ async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]]
     - same_product_rate: 동일 상품 재구매 비율 (%)
     - sales_contribution: 재구매 고객 매출 기여도 (%)
     """
-    return await repo.get_repurchase_kpis(db, product_ids)
+    # 1. 상품 그룹 필터 준비 (비즈니스 로직)
+    target_product_ids = []
+    if product_ids:
+        for pid in product_ids:
+            group_ids = PRODUCT_GROUPS.get(pid, [pid])
+            target_product_ids.extend(group_ids)
+    
+    # 2. product_id → group_id 매핑 (비즈니스 로직)
+    product_to_group = {}
+    for group_id, member_ids in PRODUCT_GROUPS.items():
+        for member_id in member_ids:
+            product_to_group[member_id] = group_id
+
+    # 3. Repository 호출 (준비된 데이터 전달)
+    return await repo.get_repurchase_kpis(db, target_product_ids, product_to_group)
 
 
 async def get_repurchase_customer_list(
@@ -126,7 +181,7 @@ async def get_customer_repurchase_detail(db: AsyncSession, customer_id: str):
     avg_period = 0
     if total_order_count > 1 and customer_info.first_order_date and customer_info.last_order_date:
         avg_period = (customer_info.last_order_date - customer_info.first_order_date).days // (total_order_count - 1)
-    
+
     return {
         "customer": {
             "customer_id": customer_id,

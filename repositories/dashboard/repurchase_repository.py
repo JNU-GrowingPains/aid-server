@@ -30,108 +30,18 @@ async def get_repurchase_product_list(db: AsyncSession):
     return result.all()
 
 
-async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]] = None):
+async def get_repurchase_kpis(db: AsyncSession, target_product_ids: List[int], product_to_group: dict):
     """
-    재구매 KPI 계산
-    - 비회원 포함: member_id가 __guest__:로 시작하면 billing_name + order_address_1로 식별
-    - 그룹화 적용: product_ids에 해당하는 그룹 내 모든 상품 포함
-    - 그룹 내 상품끼리의 재구매는 "동일 상품 재구매"로 계산
+    재구매 KPI 계산 (Repository - DB 조회만 담당)
     
-    반환 KPI:
-    1. total_repurchase_count: 총 재구매 고객 수
-    2. avg_repurchase_rate: 평균 재구매율 (%)
-    3. avg_repurchase_days: 재구매까지 걸린 평균 기간 (일)
-    4. same_product_rate: 동일 상품 재구매 비율 (%)
-    5. sales_contribution: 재구매 고객 매출 기여도 (%)
+    Args:
+        target_product_ids: 필터링할 상품 ID 리스트 (그룹 확장 완료)
+        product_to_group: product_id → group_id 매핑 딕셔너리
     """
+    # 쿼리 1: 고객별 구매 내역 조회
+    purchases = await _get_customer_purchases(db, target_product_ids)
     
-    # 1. product_ids가 주어진 경우, 그룹 내 모든 상품 ID 포함
-    target_product_ids = []
-    if product_ids:
-        for pid in product_ids:
-            group_ids = PRODUCT_GROUPS.get(pid, [pid])
-            target_product_ids.extend(group_ids)
-    
-    # 2. product_id → group_id 역매핑 생성 (그룹 내 상품끼리 동일 상품으로 판단하기 위함)
-    product_to_group = {}
-    for group_id, member_ids in PRODUCT_GROUPS.items():
-        for member_id in member_ids:
-            product_to_group[member_id] = group_id
-    
-    # 3. SQL CTE로 product_groups 매핑 테이블 생성
-    product_groups_cte = "\n".join([
-        f"SELECT {pid} AS product_id, {gid} AS group_id"
-        for pid, gid in product_to_group.items()
-    ])
-    if product_groups_cte:
-        product_groups_cte = f"product_groups AS (\n{' UNION ALL '.join([f'SELECT {pid} AS product_id, {gid} AS group_id' for pid, gid in product_to_group.items()])}\n),"
-    else:
-        product_groups_cte = ""
-    
-    # 4. 고객별 주문-상품 조합 추출 (비회원 포함)
-    # customer_key: 회원은 user_id, 비회원은 "billing_name|order_address_1"
-    customer_purchases_query = text(f"""
-        WITH {product_groups_cte}
-        customer_purchases AS (
-            SELECT 
-                CAST(CASE 
-                    WHEN o.member_id LIKE '__guest__%' 
-                    THEN CONCAT(o.billing_name, '|', o.order_address_1)
-                    ELSE CAST(o.user_id AS CHAR)
-                END AS CHAR CHARSET utf8mb4) COLLATE utf8mb4_unicode_ci AS customer_key,
-                o.order_id,
-                o.order_date,
-                op.product_id,
-                {"COALESCE(pg.group_id, op.product_id)" if product_groups_cte else "op.product_id"} AS group_id,
-                o.payment_amount,
-                o.member_id
-            FROM orders o
-            JOIN order_products op ON o.order_id = op.order_id
-            {"LEFT JOIN product_groups pg ON op.product_id = pg.product_id" if product_groups_cte else ""}
-            WHERE 1=1
-                {f"AND op.product_id IN ({','.join(map(str, target_product_ids))})" if target_product_ids else ""}
-        ),
-        -- 5. 재구매 쌍 생성 (첫 구매 → 재구매)
-        repurchase_pairs AS (
-            SELECT 
-                cp1.customer_key,
-                cp1.product_id AS first_product_id,
-                cp2.product_id AS repurchase_product_id,
-                cp1.group_id AS first_group_id,
-                cp2.group_id AS repurchase_group_id,
-                cp1.order_date AS first_order_date,
-                cp2.order_date AS repurchase_order_date,
-                DATEDIFF(cp2.order_date, cp1.order_date) AS days_between,
-                cp2.payment_amount AS repurchase_amount,
-                cp1.member_id,
-                cp2.member_id AS repurchase_member_id
-            FROM customer_purchases cp1
-            JOIN customer_purchases cp2 
-                ON cp1.customer_key = cp2.customer_key
-                AND cp1.order_date < cp2.order_date
-        )
-        SELECT 
-            -- A. 총 재구매 고객 수
-            COUNT(DISTINCT customer_key) AS total_repurchase_count,
-            
-            -- B. 전체 고객 수 (재구매율 계산용)
-            (SELECT COUNT(DISTINCT customer_key) FROM customer_purchases) AS total_customers,
-            
-            -- C. 평균 재구매 소요 기간
-            AVG(days_between) AS avg_repurchase_days,
-            
-            -- D. 동일 상품 재구매 건수 (같은 그룹끼리도 동일 상품으로 계산)
-            SUM(CASE WHEN first_group_id = repurchase_group_id THEN 1 ELSE 0 END) AS same_product_count,
-            
-            -- E. 전체 재구매 건수
-            COUNT(*) AS total_pairs
-        FROM repurchase_pairs
-    """)
-    
-    result = await db.execute(customer_purchases_query)
-    row = result.first()
-    
-    if not row or row.total_repurchase_count == 0:
+    if not purchases:
         return {
             "total_repurchase_count": 0,
             "avg_repurchase_rate": 0.0,
@@ -140,69 +50,197 @@ async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]]
             "sales_contribution": 0.0
         }
     
-    # 재구매율 계산
-    avg_repurchase_rate = (row.total_repurchase_count / row.total_customers * 100) if row.total_customers > 0 else 0.0
+    # 쿼리 2: 전체 고객 수 조회
+    total_customers = await _get_total_customers(db, target_product_ids)
     
-    # 동일 상품 재구매 비율
-    same_product_rate = (row.same_product_count / row.total_pairs * 100) if row.total_pairs > 0 else 0.0
+    # Python에서 재구매 통계 계산
+    stats = _calculate_repurchase_stats(purchases, product_to_group)
     
-    # 재구매 고객 매출 기여도 계산
-    sales_contribution_query = text("""
-        WITH customer_purchases AS (
-            SELECT 
-                CAST(CASE 
-                    WHEN o.member_id LIKE '__guest__%' 
-                    THEN CONCAT(o.billing_name, '|', o.order_address_1)
-                    ELSE CAST(o.user_id AS CHAR)
-                END AS CHAR CHARSET utf8mb4) COLLATE utf8mb4_unicode_ci AS customer_key,
-                o.order_id,
-                o.order_date,
-                op.product_id,
-                o.payment_amount
-            FROM orders o
-            JOIN order_products op ON o.order_id = op.order_id
-            WHERE 1=1
-                {product_filter}
-        ),
-        repurchase_customers AS (
-            SELECT DISTINCT cp1.customer_key
-            FROM customer_purchases cp1
-            JOIN customer_purchases cp2 
-                ON cp1.customer_key = cp2.customer_key
-                AND cp1.order_date < cp2.order_date
-        )
-        SELECT 
-            SUM(CASE WHEN rc.customer_key IS NOT NULL THEN o.payment_amount ELSE 0 END) AS repurchase_sales,
-            SUM(o.payment_amount) AS total_sales
-        FROM orders o
-        LEFT JOIN (
-            SELECT 
-                CAST(CASE 
-                    WHEN member_id LIKE '__guest__%' 
-                    THEN CONCAT(billing_name, '|', order_address_1)
-                    ELSE CAST(user_id AS CHAR)
-                END AS CHAR CHARSET utf8mb4) COLLATE utf8mb4_unicode_ci AS customer_key,
-                order_id
-            FROM orders
-        ) o_key ON o.order_id = o_key.order_id
-        LEFT JOIN repurchase_customers rc ON o_key.customer_key = rc.customer_key
-    """.replace(
-        '{product_filter}',
-        f"AND op.product_id IN ({','.join(map(str, target_product_ids))})" if target_product_ids else ""
-    ))
+    # 쿼리 3: 매출 기여도 조회
+    sales_contribution = await _get_sales_contribution(db, target_product_ids)
     
-    sales_result = await db.execute(sales_contribution_query)
-    sales_row = sales_result.first()
-    
-    sales_contribution = (sales_row.repurchase_sales / sales_row.total_sales * 100) if sales_row and sales_row.total_sales > 0 else 0.0
+    # 최종 결과
+    repurchase_rate = (stats['repurchase_count'] / total_customers * 100) if total_customers > 0 else 0.0
+    same_product_rate = (stats['same_product_count'] / stats['total_pairs'] * 100) if stats['total_pairs'] > 0 else 0.0
     
     return {
-        "total_repurchase_count": row.total_repurchase_count,
-        "avg_repurchase_rate": round(avg_repurchase_rate, 1),
-        "avg_repurchase_days": int(row.avg_repurchase_days or 0),
+        "total_repurchase_count": stats['repurchase_count'],
+        "avg_repurchase_rate": round(repurchase_rate, 1),
+        "avg_repurchase_days": stats['avg_days'],
         "same_product_rate": round(same_product_rate, 1),
         "sales_contribution": round(sales_contribution, 1)
     }
+
+
+async def _get_customer_purchases(db: AsyncSession, product_ids: List[int]):
+    """쿼리 1: 고객별 구매 내역 (SQLAlchemy ORM)"""
+    from sqlalchemy import case, cast, String
+    
+    # customer_key 생성 (회원/비회원 구분)
+    customer_key = case(
+        (Order.member_id.like('__guest__%'), 
+         func.concat(Order.billing_name, '|', Order.order_address_1)),
+        else_=cast(Order.user_id, String)
+    ).label('customer_key')
+    
+    # 기본 쿼리
+    query = (
+        select(
+            customer_key,
+            Order.order_date,
+            OrderProduct.product_id
+        )
+        .select_from(Order)
+        .join(OrderProduct, Order.order_id == OrderProduct.order_id)
+    )
+    
+    # 상품 필터 적용
+    if product_ids:
+        query = query.where(OrderProduct.product_id.in_(product_ids))
+    
+    # 정렬
+    query = query.order_by(customer_key, Order.order_date)
+    
+    result = await db.execute(query)
+    return result.all()
+
+
+async def _get_total_customers(db: AsyncSession, product_ids: List[int]) -> int:
+    """쿼리 2: 전체 고객 수 (SQLAlchemy ORM)"""
+    from sqlalchemy import case, cast, String
+    
+    # customer_key 생성 (회원/비회원 구분)
+    customer_key = case(
+        (Order.member_id.like('__guest__%'), 
+         func.concat(Order.billing_name, '|', Order.order_address_1)),
+        else_=cast(Order.user_id, String)
+    )
+    
+    # 기본 쿼리
+    query = (
+        select(func.count(distinct(customer_key)))
+        .select_from(Order)
+        .join(OrderProduct, Order.order_id == OrderProduct.order_id)
+    )
+    
+    # 상품 필터 적용
+    if product_ids:
+        query = query.where(OrderProduct.product_id.in_(product_ids))
+    
+    result = await db.execute(query)
+    return result.scalar() or 0
+
+
+def _calculate_repurchase_stats(purchases, product_to_group: dict) -> dict:
+    """Python에서 재구매 통계 계산"""
+    from collections import defaultdict
+    from datetime import date
+    
+    # 고객별 주문 그룹화
+    customer_orders = defaultdict(list)
+    for row in purchases:
+        customer_orders[row.customer_key].append({
+            'date': row.order_date,
+            'product_id': row.product_id,
+            'group_id': product_to_group.get(row.product_id, row.product_id)
+        })
+    
+    # 재구매 통계
+    repurchase_count = 0
+    total_days = 0
+    same_product_count = 0
+    total_pairs = 0
+    
+    for customer_key, orders in customer_orders.items():
+        if len(orders) < 2:
+            continue
+        
+        repurchase_count += 1
+        orders_sorted = sorted(orders, key=lambda x: x['date'])
+        
+        # 재구매 쌍 생성
+        for i in range(len(orders_sorted)):
+            for j in range(i + 1, len(orders_sorted)):
+                first = orders_sorted[i]
+                second = orders_sorted[j]
+                
+                days_between = (second['date'] - first['date']).days
+                total_days += days_between
+                total_pairs += 1
+                
+                # 동일 그룹이면 동일 상품 재구매
+                if first['group_id'] == second['group_id']:
+                    same_product_count += 1
+    
+    return {
+        'repurchase_count': repurchase_count,
+        'avg_days': int(total_days / total_pairs) if total_pairs > 0 else 0,
+        'same_product_count': same_product_count,
+        'total_pairs': total_pairs
+    }
+
+
+async def _get_sales_contribution(db: AsyncSession, product_ids: List[int]) -> float:
+    """쿼리 3: 매출 기여도 (간단한 방식으로 분리)"""
+    from sqlalchemy import case, cast, String
+    
+    # 1. 고객별 구매 정보 조회
+    purchases = await _get_customer_purchases(db, product_ids)
+    
+    if not purchases:
+        return 0.0
+    
+    # 2. 재구매 고객 목록 추출 (Python)
+    from collections import defaultdict
+    customer_orders = defaultdict(list)
+    
+    for row in purchases:
+        customer_orders[row.customer_key].append(row.order_date)
+    
+    # 재구매 고객 (2회 이상 구매)
+    repurchase_customers = {
+        customer_key 
+        for customer_key, dates in customer_orders.items() 
+        if len(dates) >= 2
+    }
+    
+    if not repurchase_customers:
+        return 0.0
+    
+    # 3. 전체 매출 조회 (ORM)
+    total_sales_query = select(func.sum(Order.payment_amount))
+    total_sales_result = await db.execute(total_sales_query)
+    total_sales = total_sales_result.scalar() or 0
+    
+    if total_sales == 0:
+        return 0.0
+    
+    # 4. 재구매 고객 매출 조회 (ORM)
+    customer_key = case(
+        (Order.member_id.like('__guest__%'), 
+         func.concat(Order.billing_name, '|', Order.order_address_1)),
+        else_=cast(Order.user_id, String)
+    )
+    
+    # 재구매 고객의 주문만 필터링
+    repurchase_sales_query = (
+        select(func.sum(Order.payment_amount))
+        .where(
+            or_(*[
+                and_(
+                    Order.member_id.like('__guest__%'),
+                    func.concat(Order.billing_name, '|', Order.order_address_1) == customer
+                ) if '|' in customer else
+                cast(Order.user_id, String) == customer
+                for customer in repurchase_customers
+            ])
+        )
+    )
+    
+    repurchase_sales_result = await db.execute(repurchase_sales_query)
+    repurchase_sales = repurchase_sales_result.scalar() or 0
+    
+    return (repurchase_sales / total_sales * 100)
 
 
 async def get_repurchase_customer_list(
