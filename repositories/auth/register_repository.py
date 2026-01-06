@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.models import Customer, Site
+from datetime import datetime, timezone
 
 
 class CustomerRepository:
@@ -20,7 +21,8 @@ class CustomerRepository:
             name=name,
             email=email,
             password=hashed_pw,
-            customer_category=category
+            customer_category=category,
+            created_at=datetime.now(timezone.utc)  # 가입일 자동 설정
         )
         db.add(customer)
         await db.flush()  # customer_id 확보
