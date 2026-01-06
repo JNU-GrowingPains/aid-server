@@ -3,7 +3,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.database import get_db
+from database.session import get_db
 from schemas.auth.login_schema import LoginRequest, TokenPair, RefreshRequest
 from services.auth.login_service import LoginService
 

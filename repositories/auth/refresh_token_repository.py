@@ -3,6 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from models.models import RefreshToken
+from datetime import datetime, timezone
 
 
 class RefreshTokenRepository:
@@ -15,6 +16,7 @@ class RefreshTokenRepository:
         refresh_token = RefreshToken(
             customer_id=customer_id,
             token=token,
+            created_at=datetime.now(timezone.utc)  # 생성일 자동 설정
         )
         db.add(refresh_token)
         await db.commit()
