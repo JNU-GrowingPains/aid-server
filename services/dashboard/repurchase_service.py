@@ -69,7 +69,8 @@ async def get_repurchase_customer_list(
         
         items.append({
             "user_id": r.user_id,
-            "customer_id": display_customer_id,  # 회원: member_id, 비회원: "비회원"
+            "customer_id": display_customer_id,  # 표시용: 회원은 member_id, 비회원은 "비회원"
+            "customer_key": r.member_id,  # API 호출용: 실제 key (회원: member_id, 비회원: name|address)
             "name": r.name or "-",
             "grade": r.grade,
             "purchase_count": f"{r.purchase_count}회",

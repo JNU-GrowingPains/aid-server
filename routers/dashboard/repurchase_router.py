@@ -82,7 +82,8 @@ async def repurchase_customer_list(
     - page: 현재 페이지
     - limit: 페이지당 개수
     - items: 고객 리스트
-      - customer_id: 회원 ID (비회원은 공백)
+      - customer_id: 표시용 ID (회원: member_id, 비회원: "비회원")
+      - customer_key: API 호출용 실제 key (회원: member_id, 비회원: "name|address")
       - name: 이름 (비회원은 billing_name)
       - grade: 등급
       - purchase_count: 구매 횟수
