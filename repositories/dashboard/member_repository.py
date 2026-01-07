@@ -11,10 +11,10 @@ class MemberRepository:
     """고객 분석 관련 데이터베이스 쿼리"""
     
     @staticmethod
-    async def get_member_grade_distribution(db: AsyncSession, site_id: int) -> List[Dict[str, Any]]:
+    async def get_member_grade_distribution(db: AsyncSession) -> List[Dict[str, Any]]:
         """등급별 고객 수 분포 조회 (막대그래프용)"""
         # 전체 고객 수
-        total_query = select(func.count(Member.user_id)).where(Member.site_id == site_id)
+        total_query = select(func.count(Member.user_id))
         total_members = (await db.execute(total_query)).scalar() or 0
         
         # 등급별 고객 수
@@ -24,7 +24,6 @@ class MemberRepository:
                 func.count(Member.user_id).label("member_count")
             )
             .join(Member, Member.group_id == MemberGroup.group_id)
-            .where(Member.site_id == site_id)
             .group_by(MemberGroup.group_name)
             .order_by(MemberGroup.group_name)
         )
@@ -46,7 +45,7 @@ class MemberRepository:
         }
     
     @staticmethod
-    async def get_top_members_by_points(db: AsyncSession, site_id: int, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_top_members_by_points(db: AsyncSession, limit: int = 10) -> List[Dict[str, Any]]:
         """포인트 상위 고객 조회 (오른쪽 패널용)"""
         # 최근 주문의 billing_name을 가져오는 서브쿼리
         subq_name = select(Order.billing_name).where(
@@ -64,7 +63,6 @@ class MemberRepository:
             )
             .join(MemberGroup, Member.group_id == MemberGroup.group_id)
             .outerjoin(Order, Member.user_id == Order.user_id)
-            .where(Member.site_id == site_id)
             .group_by(Member.user_id, Member.member_id, MemberGroup.group_name, Member.available_points)
             .order_by(desc(Member.available_points))
             .limit(limit)
@@ -92,7 +90,6 @@ class MemberRepository:
     @staticmethod
     async def get_member_list(
         db: AsyncSession, 
-        site_id: int, 
         page: int, 
         limit: int, 
         grade_filter: Optional[str] = None,
@@ -122,7 +119,6 @@ class MemberRepository:
             )
             .join(MemberGroup, Member.group_id == MemberGroup.group_id)
             .outerjoin(Order, Member.user_id == Order.user_id)
-            .where(Member.site_id == site_id)
             .group_by(Member.user_id, Member.member_id, MemberGroup.group_name, Member.available_points)
         )
         
@@ -191,9 +187,9 @@ class MemberRepository:
 
 
 # 기존 함수들 (하위 호환성을 위해 유지)
-async def fetch_customer_kpi(db: AsyncSession, site_id: int):
+async def fetch_customer_kpi(db: AsyncSession):
     """기존 호환성을 위한 함수"""
-    grade_stats = await MemberRepository.get_member_grade_distribution(db, site_id)
+    grade_stats = await MemberRepository.get_member_grade_distribution(db)
     total = grade_stats["total_members"]
     vip_count = 0
     
@@ -204,9 +200,9 @@ async def fetch_customer_kpi(db: AsyncSession, site_id: int):
     
     return total, 0, vip_count
 
-async def fetch_customer_grade_dist(db: AsyncSession, site_id: int):
+async def fetch_customer_grade_dist(db: AsyncSession):
     """기존 호환성을 위한 함수"""
-    grade_stats = await MemberRepository.get_member_grade_distribution(db, site_id)
+    grade_stats = await MemberRepository.get_member_grade_distribution(db)
     
     # 기존 형식으로 변환
     result = []
@@ -218,10 +214,10 @@ async def fetch_customer_grade_dist(db: AsyncSession, site_id: int):
     
     return result
 
-async def fetch_customer_list(db: AsyncSession, site_id: int, page: int, limit: int, grade: Optional[str], sort_by: str):
+async def fetch_customer_list(db: AsyncSession, page: int, limit: int, grade: Optional[str], sort_by: str):
     """기존 호환성을 위한 함수"""
     member_data = await MemberRepository.get_member_list(
-        db, site_id, page, limit, grade, sort_by, "desc"
+        db, page, limit, grade, sort_by, "desc"
     )
     
     # 기존 형식으로 변환

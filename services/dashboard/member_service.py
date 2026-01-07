@@ -14,10 +14,10 @@ class MemberService:
     """고객 분석 비즈니스 로직"""
     
     @staticmethod
-    async def get_member_grade_statistics(db: AsyncSession, site_id: int) -> MemberGradeStatsResponse:
+    async def get_member_grade_statistics(db: AsyncSession) -> MemberGradeStatsResponse:
         """등급별 고객 수 통계 조회 (막대그래프용)"""
         try:
-            stats_data = await MemberRepository.get_member_grade_distribution(db, site_id)
+            stats_data = await MemberRepository.get_member_grade_distribution(db)
             
             grade_items = [
                 MemberGradeItem(**grade_data) 
@@ -36,10 +36,10 @@ class MemberService:
             )
     
     @staticmethod
-    async def get_top_members(db: AsyncSession, site_id: int, limit: int = 10) -> TopMemberResponse:
+    async def get_top_members(db: AsyncSession, limit: int = 10) -> TopMemberResponse:
         """포인트 상위 고객 조회 (오른쪽 패널용)"""
         try:
-            top_data = await MemberRepository.get_top_members_by_points(db, site_id, limit)
+            top_data = await MemberRepository.get_top_members_by_points(db, limit)
             
             top_member_items = [
                 TopMemberItem(**member_data) 
@@ -60,7 +60,6 @@ class MemberService:
     @staticmethod
     async def get_member_list(
         db: AsyncSession, 
-        site_id: int, 
         page: int, 
         limit: int,
         grade_filter: Optional[str] = None,
@@ -97,7 +96,7 @@ class MemberService:
                 order = "desc"
             
             member_data = await MemberRepository.get_member_list(
-                db, site_id, page, limit, grade_filter, sort_by, order
+                db, page, limit, grade_filter, sort_by, order
             )
             
             member_items = [
@@ -124,9 +123,9 @@ class MemberService:
 
 
 # 기존 함수들 (하위 호환성을 위해 유지)
-async def get_customer_kpi(db: AsyncSession, site_id: int):
+async def get_customer_kpi(db: AsyncSession):
     """기존 호환성을 위한 함수"""
-    stats = await MemberService.get_member_grade_statistics(db, site_id)
+    stats = await MemberService.get_member_grade_statistics(db)
     vip_count = 0
     
     for grade in stats.grade_distribution:
@@ -140,9 +139,9 @@ async def get_customer_kpi(db: AsyncSession, site_id: int):
         "vip_customers": vip_count
     }
 
-async def get_customer_grade_counts(db: AsyncSession, site_id: int):
+async def get_customer_grade_counts(db: AsyncSession):
     """기존 호환성을 위한 함수"""
-    stats = await MemberService.get_member_grade_statistics(db, site_id)
+    stats = await MemberService.get_member_grade_statistics(db)
     result = {"ALL": stats.total_members}
     
     for grade in stats.grade_distribution:
@@ -150,9 +149,9 @@ async def get_customer_grade_counts(db: AsyncSession, site_id: int):
     
     return result
 
-async def get_customer_list(db: AsyncSession, site_id: int, page: int, limit: int, grade: Optional[str], sort_by: str):
+async def get_customer_list(db: AsyncSession, page: int, limit: int, grade: Optional[str], sort_by: str):
     """기존 호환성을 위한 함수"""
-    member_list = await MemberService.get_member_list(db, site_id, page, limit, grade, sort_by, "desc")
+    member_list = await MemberService.get_member_list(db, page, limit, grade, sort_by, "desc")
     
     items = []
     for member in member_list.members:

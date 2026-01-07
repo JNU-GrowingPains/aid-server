@@ -42,11 +42,10 @@ class MemberRouter:
             """
         )
         async def get_member_grade_statistics(
-            site_id: int = Query(1, description="사이트 ID"),
             db: AsyncSession = Depends(get_db)
         ):
             try:
-                result = await MemberService.get_member_grade_statistics(db, site_id)
+                result = await MemberService.get_member_grade_statistics(db)
                 return result
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"등급별 통계 조회 실패: {str(e)}")
@@ -69,11 +68,10 @@ class MemberRouter:
         )
         async def get_top_members(
             limit: int = Query(10, ge=1, le=50, description="조회할 상위 고객 수"),
-            site_id: int = Query(1, description="사이트 ID"),
             db: AsyncSession = Depends(get_db)
         ):
             try:
-                result = await MemberService.get_top_members(db, site_id, limit)
+                result = await MemberService.get_top_members(db, limit)
                 return result
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"상위 고객 조회 실패: {str(e)}")
@@ -122,12 +120,11 @@ class MemberRouter:
             grade: Optional[str] = Query(None, description="등급 필터 (VIP, PLATINUM, GOLD 등)"),
             sort_by: str = Query("latest_purchase", description="정렬 기준 (latest_purchase, purchase_count, points, name)"),
             order: str = Query("desc", description="정렬 순서 (desc, asc)"),
-            site_id: int = Query(1, description="사이트 ID"),
             db: AsyncSession = Depends(get_db)
         ):
             try:
                 result = await MemberService.get_member_list(
-                    db, site_id, page, limit, grade, sort_by, order
+                    db, page, limit, grade, sort_by, order
                 )
                 return result
             except Exception as e:
@@ -144,23 +141,18 @@ from services.dashboard.member_service import (
     get_customer_kpi, get_customer_grade_counts, get_customer_list
 )
 
-async def get_current_site_id(): 
-    return 1
-
 # 기존 엔드포인트들 (하위 호환성 유지)
 @router.get("/kpis")
 async def customer_kpis(
-    db: AsyncSession = Depends(get_db),
-    site_id: int = Depends(get_current_site_id)
+    db: AsyncSession = Depends(get_db)
 ):
-    return await get_customer_kpi(db, site_id)
+    return await get_customer_kpi(db)
 
 @router.get("/grades")
 async def customer_grade_counts(
-    db: AsyncSession = Depends(get_db),
-    site_id: int = Depends(get_current_site_id)
+    db: AsyncSession = Depends(get_db)
 ):
-    return await get_customer_grade_counts(db, site_id)
+    return await get_customer_grade_counts(db)
 
 @router.get("/list")
 async def customer_list(
@@ -168,7 +160,6 @@ async def customer_list(
     limit: int = Query(10, ge=0, le=100),  # 0 허용 (전체 조회)
     grade: Optional[str] = Query(None),
     sort_by: str = Query("latest_purchase", pattern="^(latest_purchase|purchase_count|points|name)$"),
-    db: AsyncSession = Depends(get_db),
-    site_id: int = Depends(get_current_site_id)
+    db: AsyncSession = Depends(get_db)
 ):
-    return await get_customer_list(db, site_id, page, limit, grade, sort_by)
+    return await get_customer_list(db, page, limit, grade, sort_by)

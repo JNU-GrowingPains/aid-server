@@ -38,8 +38,8 @@ async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]]
     - 그룹 내 상품끼리의 재구매는 "동일 상품 재구매"로 계산
     
     반환 KPI:
-    1. total_repurchase_count: 총 재구매 고객 수
-    2. avg_repurchase_rate: 평균 재구매율 (%)
+    1. total_repurchase_count: 총 재구매 수 (첫 구매를 제외한 모든 주문 수)
+    2. avg_repurchase_rate: 평균 재구매율 (재구매 고객 수 / 전체 고객 수 × 100)
     3. avg_repurchase_days: 재구매까지 걸린 평균 기간 (일)
     4. same_product_rate: 동일 상품 재구매 비율 (%)
     5. sales_contribution: 재구매 고객 매출 기여도 (%)
@@ -111,19 +111,22 @@ async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]]
                 AND cp1.order_date < cp2.order_date
         )
         SELECT 
-            -- A. 총 재구매 고객 수
-            COUNT(DISTINCT customer_key) AS total_repurchase_count,
+            -- A. 총 재구매 수 (첫 구매를 제외한 모든 주문 수)
+            (SELECT COUNT(*) FROM customer_purchases) - (SELECT COUNT(DISTINCT customer_key) FROM customer_purchases) AS total_repurchase_count,
             
             -- B. 전체 고객 수 (재구매율 계산용)
             (SELECT COUNT(DISTINCT customer_key) FROM customer_purchases) AS total_customers,
             
-            -- C. 평균 재구매 소요 기간
+            -- C. 재구매 고객 수 (재구매율 계산용)
+            COUNT(DISTINCT customer_key) AS repurchase_customer_count,
+            
+            -- D. 평균 재구매 소요 기간
             AVG(days_between) AS avg_repurchase_days,
             
-            -- D. 동일 상품 재구매 건수 (같은 그룹끼리도 동일 상품으로 계산)
+            -- E. 동일 상품 재구매 건수 (같은 그룹끼리도 동일 상품으로 계산)
             SUM(CASE WHEN first_group_id = repurchase_group_id THEN 1 ELSE 0 END) AS same_product_count,
             
-            -- E. 전체 재구매 건수
+            -- F. 전체 재구매 쌍 수
             COUNT(*) AS total_pairs
         FROM repurchase_pairs
     """)
@@ -131,7 +134,7 @@ async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]]
     result = await db.execute(customer_purchases_query)
     row = result.first()
     
-    if not row or row.total_repurchase_count == 0:
+    if not row or row.repurchase_customer_count == 0:
         return {
             "total_repurchase_count": 0,
             "avg_repurchase_rate": 0.0,
@@ -140,8 +143,8 @@ async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]]
             "sales_contribution": 0.0
         }
     
-    # 재구매율 계산
-    avg_repurchase_rate = (row.total_repurchase_count / row.total_customers * 100) if row.total_customers > 0 else 0.0
+    # 재구매율 계산 (재구매 고객 수 / 전체 고객 수)
+    avg_repurchase_rate = (row.repurchase_customer_count / row.total_customers * 100) if row.total_customers > 0 else 0.0
     
     # 동일 상품 재구매 비율
     same_product_rate = (row.same_product_count / row.total_pairs * 100) if row.total_pairs > 0 else 0.0
@@ -218,6 +221,7 @@ async def get_repurchase_customer_list(
     - 비회원 포함: member_id가 __guest__:로 시작하면 member_id 공백, 이름은 billing_name
     - 그룹화 적용
     - 등급 필터, 정렬 적용
+    - 재구매 쌍 로직 적용: 실제로 재구매한 고객만 조회
     """
     
     # 1. product_ids가 주어진 경우, 그룹 내 모든 상품 ID 포함
@@ -227,119 +231,138 @@ async def get_repurchase_customer_list(
             group_ids = PRODUCT_GROUPS.get(pid, [pid])
             target_product_ids.extend(group_ids)
     
-    # 2. 재구매 고객 추출 (회원 + 비회원)
-    # 회원 재구매 고객
-    base_member_query = (
-        select(
-            Member.user_id,
-            Member.member_id,
-            func.max(Order.billing_name).label("name"),
-            MemberGroup.group_name.label("grade"),
-            Member.available_points.label("point"),
-            func.max(Order.order_phone_number).label("phone"),
-            func.max(Order.order_email).label("email"),
-            func.concat(func.max(Order.order_address_1), " ", func.max(Order.order_address_2)).label("address"),
-            func.count(distinct(Order.order_id)).label("purchase_count"),
-            func.max(Order.order_date).label("last_purchase_date"),
-            func.min(Order.order_date).label("first_purchase_date")
+    # 2. 재구매 고객 customer_key 목록 추출 (재구매 쌍 로직)
+    repurchase_customers_query = text(f"""
+        WITH customer_purchases AS (
+            SELECT 
+                CAST(CASE 
+                    WHEN o.member_id LIKE '__guest__%' 
+                    THEN CONCAT(o.billing_name, '|', o.order_address_1)
+                    ELSE CAST(o.user_id AS CHAR)
+                END AS CHAR CHARSET utf8mb4) COLLATE utf8mb4_unicode_ci AS customer_key,
+                o.order_id,
+                o.order_date,
+                o.user_id,
+                o.member_id
+            FROM orders o
+            {"JOIN order_products op ON o.order_id = op.order_id" if target_product_ids else ""}
+            WHERE 1=1
+                {f"AND op.product_id IN ({','.join(map(str, target_product_ids))})" if target_product_ids else ""}
+            {"GROUP BY o.order_id, o.user_id, o.member_id, o.billing_name, o.order_address_1, o.order_date" if target_product_ids else ""}
+        ),
+        repurchase_pairs AS (
+            SELECT DISTINCT cp1.customer_key, cp1.user_id, cp1.member_id
+            FROM customer_purchases cp1
+            JOIN customer_purchases cp2 
+                ON cp1.customer_key = cp2.customer_key
+                AND cp1.order_date < cp2.order_date
         )
-        .select_from(Member)
-        .join(MemberGroup, Member.group_id == MemberGroup.group_id)
-        .join(Order, Member.user_id == Order.user_id)
-        .where(Order.member_id.notlike('__guest__%'))
-    )
+        SELECT customer_key, user_id, member_id
+        FROM repurchase_pairs
+    """)
     
-    # product_ids 필터 적용
-    if target_product_ids:
-        # EXISTS 서브쿼리로 해당 상품 구매 고객만 필터링
-        product_exists = (
-            select(1)
-            .select_from(OrderProduct)
-            .where(
-                and_(
-                    OrderProduct.order_id == Order.order_id,
-                    OrderProduct.product_id.in_(target_product_ids)
-                )
+    repurchase_result = await db.execute(repurchase_customers_query)
+    repurchase_customers = repurchase_result.all()
+    
+    if not repurchase_customers:
+        return [], 0
+    
+    # 3. 재구매 고객을 회원/비회원으로 분류
+    repurchase_user_ids = []
+    repurchase_guest_keys = []
+    
+    for row in repurchase_customers:
+        if row.member_id and '__guest__' in row.member_id:
+            repurchase_guest_keys.append(row.customer_key)
+        elif row.user_id:
+            repurchase_user_ids.append(row.user_id)
+    
+    # 4. 회원 재구매 고객 정보 조회
+    member_query = None
+    if repurchase_user_ids:
+        base_member_query = (
+            select(
+                Member.user_id,
+                Member.member_id,
+                func.max(Order.billing_name).label("name"),
+                MemberGroup.group_name.label("grade"),
+                Member.available_points.label("point"),
+                func.max(Order.order_phone_number).label("phone"),
+                func.max(Order.order_email).label("email"),
+                func.concat(func.max(Order.order_address_1), " ", func.max(Order.order_address_2)).label("address"),
+                func.count(distinct(Order.order_id)).label("purchase_count"),
+                func.max(Order.order_date).label("last_purchase_date"),
+                func.min(Order.order_date).label("first_purchase_date")
             )
-            .exists()
+            .select_from(Member)
+            .join(MemberGroup, Member.group_id == MemberGroup.group_id)
+            .join(Order, Member.user_id == Order.user_id)
+            .where(Member.user_id.in_(repurchase_user_ids))
         )
-        base_member_query = base_member_query.where(product_exists)
-    
-    if grade:
-        base_member_query = base_member_query.where(MemberGroup.group_name == grade)
-    
-    member_query = base_member_query.group_by(
-        Member.user_id, Member.member_id, MemberGroup.group_name, Member.available_points
-    ).having(func.count(distinct(Order.order_id)) >= 2)
-    
-    # 비회원 재구매 고객
-    base_guest_query = (
-        select(
-            func.cast(None, BigInteger).label("user_id"),
-            func.concat(Order.billing_name, '|', func.trim(Order.order_address_1)).label("member_id"),  # "이름|주소" 형식
-            Order.billing_name.label("name"),
-            func.cast("전체", String).label("grade"),
-            func.cast(0, Integer).label("point"),
-            func.max(Order.order_phone_number).label("phone"),
-            func.max(Order.order_email).label("email"),
-            func.concat(func.max(Order.order_address_1), " ", func.max(Order.order_address_2)).label("address"),
-            func.count(distinct(Order.order_id)).label("purchase_count"),
-            func.max(Order.order_date).label("last_purchase_date"),
-            func.min(Order.order_date).label("first_purchase_date")
+        
+        if grade:
+            base_member_query = base_member_query.where(MemberGroup.group_name == grade)
+        
+        member_query = base_member_query.group_by(
+            Member.user_id, Member.member_id, MemberGroup.group_name, Member.available_points
         )
-        .select_from(Order)
-        .where(Order.member_id.like('__guest__%'))
-    )
     
-    # product_ids 필터 적용
-    if target_product_ids:
-        # EXISTS 서브쿼리로 해당 상품 구매 고객만 필터링
-        product_exists = (
-            select(1)
-            .select_from(OrderProduct)
-            .where(
-                and_(
-                    OrderProduct.order_id == Order.order_id,
-                    OrderProduct.product_id.in_(target_product_ids)
+    # 5. 비회원 재구매 고객 정보 조회
+    guest_query = None
+    if repurchase_guest_keys and not grade:  # 비회원은 등급 필터 시 제외
+        # customer_key를 파싱하여 billing_name과 order_address_1 추출
+        guest_conditions = []
+        for guest_key in repurchase_guest_keys:
+            if '|' in guest_key:
+                parts = guest_key.split('|', 1)
+                if len(parts) == 2:
+                    billing_name, address_1 = parts
+                    guest_conditions.append(
+                        and_(
+                            Order.billing_name == billing_name,
+                            Order.order_address_1 == address_1
+                        )
+                    )
+        
+        if guest_conditions:
+            base_guest_query = (
+                select(
+                    func.cast(None, BigInteger).label("user_id"),
+                    func.concat(Order.billing_name, '|', func.trim(Order.order_address_1)).label("member_id"),
+                    Order.billing_name.label("name"),
+                    func.cast("전체", String).label("grade"),
+                    func.cast(0, Integer).label("point"),
+                    func.max(Order.order_phone_number).label("phone"),
+                    func.max(Order.order_email).label("email"),
+                    func.concat(func.max(Order.order_address_1), " ", func.max(Order.order_address_2)).label("address"),
+                    func.count(distinct(Order.order_id)).label("purchase_count"),
+                    func.max(Order.order_date).label("last_purchase_date"),
+                    func.min(Order.order_date).label("first_purchase_date")
                 )
+                .select_from(Order)
+                .where(
+                    Order.member_id.like('__guest__%'),
+                    or_(*guest_conditions)
+                )
+                .group_by(Order.billing_name, Order.order_address_1)
             )
-            .exists()
-        )
-        base_guest_query = base_guest_query.where(product_exists)
+            
+            guest_query = base_guest_query
     
-    guest_query = base_guest_query.group_by(
-        Order.billing_name, Order.order_address_1
-    ).having(func.count(distinct(Order.order_id)) >= 2)
+    # 6. 쿼리 실행
+    member_result = (await db.execute(member_query)).all() if member_query else []
+    guest_result = (await db.execute(guest_query)).all() if guest_query else []
     
-    # 정렬 적용
-    if sort_by == "purchase_count":
-        member_query = member_query.order_by(desc("purchase_count"))
-        guest_query = guest_query.order_by(desc("purchase_count"))
-    elif sort_by == "points":
-        member_query = member_query.order_by(desc("point"))
-        guest_query = guest_query.order_by(desc("point"))
-    elif sort_by == "name":
-        member_query = member_query.order_by("name")
-        guest_query = guest_query.order_by("name")
-    else:  # latest_repurchase (기본)
-        member_query = member_query.order_by(desc("last_purchase_date"))
-        guest_query = guest_query.order_by(desc("last_purchase_date"))
-    
-    # 쿼리 실행
-    member_result = (await db.execute(member_query)).all()
-    guest_result = (await db.execute(guest_query)).all() if not grade else []
-    
-    # 결과 합치기
+    # 7. 결과 합치기 및 정렬 (Python에서 한 번만 정렬)
     all_rows = list(member_result) + list(guest_result)
     
-    # 정렬 (Python에서 다시 정렬)
     if sort_by == "purchase_count":
         all_rows.sort(key=lambda r: r.purchase_count, reverse=True)
     elif sort_by == "points":
         all_rows.sort(key=lambda r: r.point or 0, reverse=True)
     elif sort_by == "name":
         all_rows.sort(key=lambda r: r.name or "")
-    else:
+    else:  # latest_repurchase (기본)
         all_rows.sort(key=lambda r: r.last_purchase_date or "", reverse=True)
     
     # 페이징
