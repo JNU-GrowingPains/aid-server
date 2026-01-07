@@ -2,7 +2,7 @@
 
 from datetime import date
 from typing import Optional, List, Dict, Any
-from sqlalchemy import select, func, desc, asc, and_
+from sqlalchemy import select, func, desc, asc
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.models import Member, MemberGroup, Order
 

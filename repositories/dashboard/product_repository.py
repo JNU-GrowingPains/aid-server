@@ -67,11 +67,12 @@ async def get_kpi_summary(db: AsyncSession, from_d: date, to_d: date, product_id
 
 
 # 일별 추세 그래프 (그룹화 적용)
-async def get_daily_trend(db: AsyncSession, days: int, metric: str, product_id: Optional[int] = None):
+async def get_daily_trend(db: AsyncSession, from_d: date, to_d: date, metric: str, product_id: Optional[int] = None):
     """
     일별 판매 추세 조회 (그룹화 적용)
     - product_id가 주어지면 해당 그룹의 모든 상품 통계를 합산
     - metric: "buyers" (구매자 수), "quantity" (판매 수량), "amount" (매출액)
+    - from_d, to_d: 조회 기간
     """
     # product_id가 주어진 경우, 그룹 내 모든 product_id 가져오기
     if product_id:
@@ -97,11 +98,15 @@ async def get_daily_trend(db: AsyncSession, days: int, metric: str, product_id: 
         q = q.join(Order, OrderProduct.order_id == Order.order_id)
         q = q.where(Order.user_id.isnot(None))  # 회원만
     
+    # 날짜 범위 필터 (필수!)
+    q = q.where(OrderProduct.order_date >= from_d)
+    q = q.where(OrderProduct.order_date <= to_d)
+    
     # 그룹 내 모든 상품 필터 (그룹화 적용)
     if group_ids:
         q = q.where(OrderProduct.product_id.in_(group_ids))
 
-    q = q.group_by(OrderProduct.order_date).order_by(OrderProduct.order_date).limit(days)
+    q = q.group_by(OrderProduct.order_date).order_by(OrderProduct.order_date)
     return (await db.execute(q)).all()
 
 
@@ -125,7 +130,6 @@ async def get_top_products(db: AsyncSession, limit: int, from_date: Optional[dat
             Product.product_price.label("price")
         )
         .where(Product.product_id.in_(representative_ids))
-        .where(Product.product_id.notin_(EXCLUDED_PRODUCTS))  # 명시적 제외
     )
     
     result = await db.execute(query)

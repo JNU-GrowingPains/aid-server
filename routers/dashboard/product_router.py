@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,25 +28,58 @@ async def product_detail_stats(
 ):
     """
     특정 상품의 통계 조회 (프론트엔드 RESTful 방식)
-    """
-    # startDate, endDate를 days로 변환 (임시로 30일 기본값)
-    days = 30  # 기본값
     
-    return await get_kpi_summary(db, days, product_id)
+    기간 선택 방법:
+    - startDate, endDate 사용: 달력으로 직접 선택한 기간 (YYYY-MM-DD 형식)
+    - 미제공 시: 최근 30일 기본값
+    """
+    # startDate, endDate를 date 객체로 변환
+    from_date = None
+    to_date = None
+    
+    if startDate:
+        from_date = datetime.strptime(startDate, "%Y-%m-%d").date()
+    if endDate:
+        to_date = datetime.strptime(endDate, "%Y-%m-%d").date()
+    
+    # from_date, to_date 전달 (있으면 우선 사용, 없으면 days=30 기본값)
+    return await get_kpi_summary(db, days=30, product_id=product_id, 
+                                 from_date=from_date, to_date=to_date)
 
 @router.get("/stats")
 async def product_stats(
-    days: int = Query(30, ge=1), product_id: Optional[int] = Query(None),
+    days: int = Query(30, ge=1), 
+    product_id: Optional[int] = Query(None),
+    from_date: Optional[date] = Query(None, description="시작 날짜 (달력 직접 선택 시)"),
+    to_date: Optional[date] = Query(None, description="종료 날짜 (달력 직접 선택 시)"),
     db: AsyncSession = Depends(get_db)
 ):
-    return await get_kpi_summary(db, days, product_id)
+    """
+    상품 KPI 통계
+    
+    기간 선택 방법:
+    1. 최근 7일/30일/90일: days 파라미터 사용
+    2. 달력 직접 선택: from_date, to_date 사용 (우선순위 높음)
+    """
+    return await get_kpi_summary(db, days, product_id, from_date, to_date)
 
 @router.get("/chart/trend")
 async def product_trend_chart(
-    days: int = Query(30, ge=7), metric: str = Query("amount"), product_id: Optional[int] = Query(None),
+    days: int = Query(30, ge=7), 
+    metric: str = Query("amount"), 
+    product_id: Optional[int] = Query(None),
+    from_date: Optional[date] = Query(None, description="시작 날짜 (달력 직접 선택 시)"),
+    to_date: Optional[date] = Query(None, description="종료 날짜 (달력 직접 선택 시)"),
     db: AsyncSession = Depends(get_db)
 ):
-    return await get_daily_trend(db, days, metric, product_id)
+    """
+    일별 트렌드 차트
+    
+    기간 선택 방법:
+    1. 최근 7일/30일/90일: days 파라미터 사용
+    2. 달력 직접 선택: from_date, to_date 사용 (우선순위 높음)
+    """
+    return await get_daily_trend(db, days, metric, product_id, from_date, to_date)
 
 @router.get("/products/{product_id}/review-keywords")
 async def get_product_keywords(

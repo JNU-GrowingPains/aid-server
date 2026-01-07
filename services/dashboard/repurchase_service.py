@@ -7,14 +7,15 @@ from repositories.dashboard import repurchase_repository as repo
 
 async def get_repurchase_product_list(db: AsyncSession):
     """
-    그룹화된 대표 상품 목록 반환
+    그룹화된 대표 상품 목록 반환 (커스텀 상품명 적용)
     """
     rows = await repo.get_repurchase_product_list(db)
+    # Repository에서 이미 커스텀 이름이 적용된 dict 반환
     return [
         {
-            "product_id": r.product_id,
-            "product_name": r.product_name,
-            "price": r.product_price
+            "product_id": r["product_id"],
+            "product_name": r["product_name"],
+            "price": r["product_price"]
         } 
         for r in rows
     ]
@@ -101,17 +102,17 @@ async def get_customer_repurchase_detail(db: AsyncSession, customer_id: str):
     # 고객 기본 정보
     total_order_count = customer_info.total_order_count
     
-    # 재구매 상품 목록
+    # 재구매 상품 목록 (Repository에서 커스텀 이름 적용됨)
     product_items = []
     for p in products:
-        percentage = (p.repurchase_count / total_order_count * 100) if total_order_count > 0 else 0
+        percentage = (p["repurchase_count"] / total_order_count * 100) if total_order_count > 0 else 0
         product_items.append({
-            "product_id": p.product_id,
-            "product_name": p.product_name,
-            "repurchase_count": p.repurchase_count,
+            "product_id": p["product_id"],
+            "product_name": p["product_name"],
+            "repurchase_count": p["repurchase_count"],
             "percentage": round(percentage, 1),
-            "first_purchase_date": p.first_purchase_date.strftime("%Y-%m-%d") if p.first_purchase_date else None,
-            "last_purchase_date": p.last_purchase_date.strftime("%Y-%m-%d") if p.last_purchase_date else None
+            "first_purchase_date": p["first_purchase_date"].strftime("%Y-%m-%d") if p["first_purchase_date"] else None,
+            "last_purchase_date": p["last_purchase_date"].strftime("%Y-%m-%d") if p["last_purchase_date"] else None
         })
     
     # 재구매 배송지 목록
