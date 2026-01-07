@@ -28,7 +28,7 @@ async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]]
     - 교차 재구매 포함
     
     반환:
-    - total_repurchase_count: 총 재구매 고객 수
+    - total_repurchase_count: 총 재구매 수 (첫 구매 제외한 주문 수)
     - avg_repurchase_rate: 평균 재구매율 (%)
     - avg_repurchase_days: 재구매까지 걸린 평균 기간 (일)
     - same_product_rate: 동일 상품 재구매 비율 (%)
@@ -62,9 +62,13 @@ async def get_repurchase_customer_list(
         if r.purchase_count > 1 and r.last_purchase_date and r.first_purchase_date:
             period = (r.last_purchase_date - r.first_purchase_date).days // (r.purchase_count - 1)
         
+        # 비회원 판별: member_id에 "|"가 포함되어 있으면 비회원
+        is_guest = r.member_id and "|" in r.member_id
+        display_customer_id = "비회원" if is_guest else (r.member_id or "")
+        
         items.append({
             "user_id": r.user_id,
-            "customer_id": r.member_id or "",  # 회원: member_id, 비회원: "이름|주소" 형식
+            "customer_id": display_customer_id,  # 회원: member_id, 비회원: "비회원"
             "name": r.name or "-",
             "grade": r.grade,
             "purchase_count": f"{r.purchase_count}회",

@@ -19,6 +19,20 @@ PRODUCT_GROUPS = {
     39: [27, 39]
 }
 
+# 그룹별 표시 이름 (프론트엔드에 보여질 이름)
+PRODUCT_GROUP_NAMES = {
+    15: "리쥬 카밍 PDRN 피부과 쌩얼 파데프리 크림",
+    40: "단백질 앰플 젤 클렌징 폼 120ml, 200ml",
+    10: "리쥬 카밍 PDRN 버블토너",
+    34: "슈르르 콜라겐 멜팅 패치",
+    5: "슈엘로 클린 밸런스 모공 루틴 SET",
+    42: "볼케이노 VC 바디 슬리밍 크림 500ml",
+    26: "볼케이노 바디 PPC 셀룰라이트 괄사크림",
+    32: "저분자 콜라겐 리프팅 바디스크럽 워시",
+    38: "2X 더블 업 넥&바스트 바디 미스트",
+    39: "작두콩 호박 팥차 40g"
+}
+
 # 제외할 상품 ID (그룹화하지 않고 목록에서도 제외)
 EXCLUDED_PRODUCTS = [1, 18, 19]
 
@@ -69,6 +83,22 @@ def get_all_representative_ids() -> list[int]:
         대표 상품 ID 리스트
     """
     return list(PRODUCT_GROUPS.keys())
+
+
+def get_group_display_name(product_id: int) -> str:
+    """
+    그룹의 표시 이름 반환
+    
+    Args:
+        product_id: 조회할 상품 ID (대표 ID 또는 그룹 내 ID)
+        
+    Returns:
+        그룹 표시 이름
+    """
+    representative_id = get_representative_product_id(product_id)
+    if representative_id is None:
+        return None
+    return PRODUCT_GROUP_NAMES.get(representative_id, f"상품 {representative_id}")
 
 
 def is_excluded(product_id: int) -> bool:
