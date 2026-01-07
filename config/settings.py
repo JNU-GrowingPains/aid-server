@@ -31,6 +31,8 @@ CORS_ORIGINS = [
     "http://172.20.10.6:5173",  # 프론트엔드 실제 IP (Vite 개발서버)
     "https://coredata.kr",  # 프로덕션 도메인 (HTTPS)
     "http://coredata.kr",   # 프로덕션 도메인 (HTTP)
+    "https://www.coredata.kr",  # 프로덕션 도메인 www 서브도메인 (HTTPS)
+    "http://www.coredata.kr",   # 프로덕션 도메인 www 서브도메인 (HTTP)
     "*",  # 개발용 - 전부 허용
 ]
 
