@@ -1,10 +1,10 @@
 # repositories/dashboard/repurchase_repository.py
 
 from typing import Optional, List
-from sqlalchemy import select, func, desc, distinct, case, and_, or_, text, BigInteger, String, Integer
+from sqlalchemy import select, func, desc, distinct, and_, or_, text, BigInteger, String, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 from models.models import Member, MemberGroup, Order, OrderProduct, Product
-from config.product_groups import PRODUCT_GROUPS
+from config.product_groups import PRODUCT_GROUPS, PRODUCT_GROUP_NAMES
 
 
 async def get_repurchase_product_list(db: AsyncSession):
@@ -12,6 +12,7 @@ async def get_repurchase_product_list(db: AsyncSession):
     그룹화된 대표 상품 목록 반환
     PRODUCT_GROUPS의 키(대표 product_id)만 반환
     제외 상품(18, 19 등) 필터링 적용
+    커스텀 상품명 적용
     """
     from config.product_groups import EXCLUDED_PRODUCTS
     representative_ids = [pid for pid in PRODUCT_GROUPS.keys() if pid not in EXCLUDED_PRODUCTS]
@@ -23,11 +24,20 @@ async def get_repurchase_product_list(db: AsyncSession):
             Product.product_price
         )
         .where(Product.product_id.in_(representative_ids))
-        .where(Product.product_id.notin_(EXCLUDED_PRODUCTS))  # 명시적 제외
     )
     
     result = await db.execute(q)
-    return result.all()
+    rows = result.all()
+    
+    # 커스텀 상품명 적용
+    return [
+        {
+            "product_id": row.product_id,
+            "product_name": PRODUCT_GROUP_NAMES.get(row.product_id, row.product_name),
+            "product_price": row.product_price
+        }
+        for row in rows
+    ]
 
 
 async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]] = None):
@@ -59,11 +69,7 @@ async def get_repurchase_kpis(db: AsyncSession, product_ids: Optional[List[int]]
             product_to_group[member_id] = group_id
     
     # 3. SQL CTE로 product_groups 매핑 테이블 생성
-    product_groups_cte = "\n".join([
-        f"SELECT {pid} AS product_id, {gid} AS group_id"
-        for pid, gid in product_to_group.items()
-    ])
-    if product_groups_cte:
+    if product_to_group:
         product_groups_cte = f"product_groups AS (\n{' UNION ALL '.join([f'SELECT {pid} AS product_id, {gid} AS group_id' for pid, gid in product_to_group.items()])}\n),"
     else:
         product_groups_cte = ""
@@ -350,8 +356,8 @@ async def get_repurchase_customer_list(
             guest_query = base_guest_query
     
     # 6. 쿼리 실행
-    member_result = (await db.execute(member_query)).all() if member_query else []
-    guest_result = (await db.execute(guest_query)).all() if guest_query else []
+    member_result = (await db.execute(member_query)).all() if member_query is not None else []
+    guest_result = (await db.execute(guest_query)).all() if guest_query is not None else []
     
     # 7. 결과 합치기 및 정렬 (Python에서 한 번만 정렬)
     all_rows = list(member_result) + list(guest_result)
@@ -518,4 +524,16 @@ async def get_customer_repurchase_detail(db: AsyncSession, customer_id: str):
     products = (await db.execute(products_query)).all()
     addresses = (await db.execute(addresses_query)).all()
     
-    return customer_info, products, addresses
+    # 상품 목록에 커스텀 상품명 적용
+    products_with_custom_names = [
+        {
+            "product_id": p.product_id,
+            "product_name": PRODUCT_GROUP_NAMES.get(p.product_id, p.product_name),
+            "repurchase_count": p.repurchase_count,
+            "first_purchase_date": p.first_purchase_date,
+            "last_purchase_date": p.last_purchase_date
+        }
+        for p in products
+    ]
+    
+    return customer_info, products_with_custom_names, addresses
