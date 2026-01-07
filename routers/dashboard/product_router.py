@@ -17,6 +17,16 @@ async def product_list(
     limit: int = Query(10, ge=1), from_date: Optional[date] = Query(None), to_date: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
+    """
+    상품 목록 조회 (그룹화된 대표 상품)
+    
+    반환:
+    - product_id: 대표 상품 ID
+    - product_code: 상품 코드
+    - product_name: 커스텀 상품명
+    - price: 가격
+    - category: 카테고리
+    """
     return await get_top_products(db, limit, from_date, to_date)
 
 @router.get("/products/{product_id}/stats")

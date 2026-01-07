@@ -306,7 +306,7 @@ async def get_repurchase_customer_list(
             .where(Member.user_id.in_(repurchase_user_ids))
         )
         
-        if grade:
+        if grade and grade != "전체":
             base_member_query = base_member_query.where(MemberGroup.group_name == grade)
         
         member_query = base_member_query.group_by(
@@ -315,7 +315,7 @@ async def get_repurchase_customer_list(
     
     # 5. 비회원 재구매 고객 정보 조회
     guest_query = None
-    if repurchase_guest_keys and not grade:  # 비회원은 등급 필터 시 제외
+    if repurchase_guest_keys and (not grade or grade == "전체"):  # 비회원은 특정 등급 필터 시 제외
         # customer_key를 파싱하여 billing_name과 order_address_1 추출
         guest_conditions = []
         for guest_key in repurchase_guest_keys:
@@ -362,14 +362,16 @@ async def get_repurchase_customer_list(
     # 7. 결과 합치기 및 정렬 (Python에서 한 번만 정렬)
     all_rows = list(member_result) + list(guest_result)
     
+    from datetime import date as date_type
+    
     if sort_by == "purchase_count":
-        all_rows.sort(key=lambda r: r.purchase_count, reverse=True)
+        all_rows.sort(key=lambda r: r.purchase_count or 0, reverse=True)
     elif sort_by == "points":
         all_rows.sort(key=lambda r: r.point or 0, reverse=True)
     elif sort_by == "name":
-        all_rows.sort(key=lambda r: r.name or "")
+        all_rows.sort(key=lambda r: (r.name or "").lower())  # 대소문자 무시
     else:  # latest_repurchase (기본)
-        all_rows.sort(key=lambda r: r.last_purchase_date or "", reverse=True)
+        all_rows.sort(key=lambda r: r.last_purchase_date or date_type.min, reverse=True)
     
     # 페이징
     total_count = len(all_rows)
