@@ -301,3 +301,4 @@ const chartData = response.data; // [{ date: '2025-01-01', value: 450000 }, ...]
 - [회원 분석 API](./MEMBER_API_FULL_DATA.md)
 
 
+

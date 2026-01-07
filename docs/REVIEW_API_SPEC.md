@@ -281,3 +281,4 @@ const fiveStarReviews = await fetchAllReviews(5);  // 별점 5점 리뷰만
 API 관련 문의사항이 있으시면 백엔드 개발팀에 연락주세요.
 
 
+
