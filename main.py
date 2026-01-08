@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from models import models
 import time
 
-from routers.auth.register_router import router as register_router
+# from routers.auth.register_router import router as register_router  # 🔒 일시 비활성화
 from routers.auth.login_router import router as login_router
 from routers.auth.logout_router import router as logout_router
 from routers.auth.refresh_router import router as refresh_router
@@ -65,7 +65,7 @@ async def test_connection(db: AsyncSession = Depends(get_db)):
     return {"message": "Connected to AWS RDS!", "time": now}
 
 # 1. 인증 관련
-app.include_router(register_router)
+# app.include_router(register_router)  # 🔒 일시 비활성화 (회원가입 중단)
 app.include_router(login_router)
 app.include_router(logout_router)
 app.include_router(refresh_router)
