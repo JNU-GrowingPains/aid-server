@@ -526,16 +526,50 @@ async def get_customer_repurchase_detail(db: AsyncSession, customer_id: str):
     products = (await db.execute(products_query)).all()
     addresses = (await db.execute(addresses_query)).all()
     
-    # 상품 목록에 커스텀 상품명 적용
+    # 상품을 그룹별로 합산
+    from config.product_groups import PRODUCT_TO_REPRESENTATIVE
+    from collections import defaultdict
+    
+    # 대표 ID별로 집계
+    grouped_products = defaultdict(lambda: {
+        "repurchase_count": 0,
+        "first_purchase_date": None,
+        "last_purchase_date": None
+    })
+    
+    for p in products:
+        # 대표 ID 찾기 (그룹에 속하지 않으면 자기 자신)
+        rep_id = PRODUCT_TO_REPRESENTATIVE.get(p.product_id, p.product_id)
+        
+        # 구매 횟수 합산
+        grouped_products[rep_id]["repurchase_count"] += p.repurchase_count
+        
+        # 가장 빠른 첫 구매일
+        if p.first_purchase_date:
+            if not grouped_products[rep_id]["first_purchase_date"] or \
+               p.first_purchase_date < grouped_products[rep_id]["first_purchase_date"]:
+                grouped_products[rep_id]["first_purchase_date"] = p.first_purchase_date
+        
+        # 가장 늦은 마지막 구매일
+        if p.last_purchase_date:
+            if not grouped_products[rep_id]["last_purchase_date"] or \
+               p.last_purchase_date > grouped_products[rep_id]["last_purchase_date"]:
+                grouped_products[rep_id]["last_purchase_date"] = p.last_purchase_date
+    
+    # 결과 변환 (커스텀 이름 적용)
     products_with_custom_names = [
         {
-            "product_id": p.product_id,
-            "product_name": PRODUCT_GROUP_NAMES.get(p.product_id, p.product_name),
-            "repurchase_count": p.repurchase_count,
-            "first_purchase_date": p.first_purchase_date,
-            "last_purchase_date": p.last_purchase_date
+            "product_id": rep_id,
+            "product_name": PRODUCT_GROUP_NAMES.get(rep_id, f"상품 {rep_id}"),
+            "repurchase_count": data["repurchase_count"],
+            "first_purchase_date": data["first_purchase_date"],
+            "last_purchase_date": data["last_purchase_date"]
         }
-        for p in products
+        for rep_id, data in grouped_products.items()
     ]
+    
+    # 구매 횟수 순으로 정렬 후 상위 10개
+    products_with_custom_names.sort(key=lambda x: x["repurchase_count"], reverse=True)
+    products_with_custom_names = products_with_custom_names[:10]
     
     return customer_info, products_with_custom_names, addresses
