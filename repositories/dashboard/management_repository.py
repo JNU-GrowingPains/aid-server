@@ -2,8 +2,7 @@
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, extract
-from sqlalchemy.orm import joinedload
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Optional, Dict, Any
 
 from models.models import Customer, Site, Product, Member, Order
@@ -39,39 +38,25 @@ class ManagementRepository:
     
     @staticmethod
     async def get_dashboard_stats(db: AsyncSession, customer_id: int) -> Dict[str, Any]:
-        """대시보드 통계 정보 조회"""
-        # 고객의 사이트 ID 조회
-        site_query = select(Site.site_id).where(Site.customer_id == customer_id)
-        site_result = await db.execute(site_query)
-        site_id = site_result.scalar_one_or_none()
-        
-        if not site_id:
-            return {
-                "total_products": 0,
-                "total_customers": 0,
-                "monthly_revenue": 0.0
-            }
-        
-        # 등록상품 개수
-        products_query = select(func.count(Product.product_id)).where(Product.site_id == site_id)
+        """대시보드 통계 정보 조회 (전체 데이터 표시)"""
+        # 등록상품 개수 (전체)
+        products_query = select(func.count(Product.product_id))
         products_result = await db.execute(products_query)
         total_products = products_result.scalar() or 0
         
-        # 전체고객 수 (해당 사이트의 멤버 수)
-        customers_query = select(func.count(Member.user_id)).where(Member.site_id == site_id)
+        # 전체고객 수 (전체 멤버)
+        customers_query = select(func.count(Member.user_id))
         customers_result = await db.execute(customers_query)
         total_customers = customers_result.scalar() or 0
         
-        # 이번달매출
+        # 이번달매출 (전체)
         current_month = datetime.now().month
         current_year = datetime.now().year
         
         revenue_query = (
             select(func.coalesce(func.sum(Order.payment_amount), 0))
-            .join(Member, Order.user_id == Member.user_id)
             .where(
                 and_(
-                    Member.site_id == site_id,
                     extract('month', Order.order_date) == current_month,
                     extract('year', Order.order_date) == current_year
                 )
