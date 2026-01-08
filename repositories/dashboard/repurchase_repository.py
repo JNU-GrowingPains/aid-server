@@ -534,7 +534,8 @@ async def get_customer_repurchase_detail(db: AsyncSession, customer_id: str):
     grouped_products = defaultdict(lambda: {
         "repurchase_count": 0,
         "first_purchase_date": None,
-        "last_purchase_date": None
+        "last_purchase_date": None,
+        "product_name": None  # fallback용 DB 상품명
     })
     
     for p in products:
@@ -543,6 +544,10 @@ async def get_customer_repurchase_detail(db: AsyncSession, customer_id: str):
         
         # 구매 횟수 합산
         grouped_products[rep_id]["repurchase_count"] += p.repurchase_count
+        
+        # DB 상품명 저장 (대표 ID의 상품명 우선)
+        if not grouped_products[rep_id]["product_name"] or p.product_id == rep_id:
+            grouped_products[rep_id]["product_name"] = p.product_name
         
         # 가장 빠른 첫 구매일
         if p.first_purchase_date:
@@ -556,11 +561,11 @@ async def get_customer_repurchase_detail(db: AsyncSession, customer_id: str):
                p.last_purchase_date > grouped_products[rep_id]["last_purchase_date"]:
                 grouped_products[rep_id]["last_purchase_date"] = p.last_purchase_date
     
-    # 결과 변환 (커스텀 이름 적용)
+    # 결과 변환 (커스텀 이름 우선, 없으면 DB 상품명)
     products_with_custom_names = [
         {
             "product_id": rep_id,
-            "product_name": PRODUCT_GROUP_NAMES.get(rep_id, f"상품 {rep_id}"),
+            "product_name": PRODUCT_GROUP_NAMES.get(rep_id, data["product_name"] or f"상품 {rep_id}"),
             "repurchase_count": data["repurchase_count"],
             "first_purchase_date": data["first_purchase_date"],
             "last_purchase_date": data["last_purchase_date"]
